@@ -15,14 +15,13 @@ import {
   type Viewport,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import type { ArchGraph, ArchModule } from "@/types/graph";
+import type { ArchGraph, ArchModule, NodeCategory } from "@/types/graph";
 import { ArchNode } from "./ArchNode";
-import { GroupNode } from "./GroupNode";
+import { GroupNode, type GroupNodeData } from "./GroupNode";
 import { DetailSlider } from "./DetailSlider";
 import {
   getZoomLevel,
-  buildCollapsedGraph,
-  buildExpandedGraph,
+  buildHybridGraph,
   type ZoomLevel,
 } from "@/lib/semantic-zoom";
 
@@ -45,17 +44,76 @@ function GraphCanvasInner({
   selectedNodeId,
 }: GraphCanvasProps) {
   const { fitView } = useReactFlow();
-  const [zoomLevel, setZoomLevel] = useState<ZoomLevel>("compact");
-  const [locked, setLocked] = useState(false);
-  const prevZoomLevel = useRef<ZoomLevel>("compact");
+  const [zoomLevel, setZoomLevel] = useState<ZoomLevel>("collapsed");
+  const [locked, setLocked] = useState(true); // Default locked since we use double-click now
+  const prevZoomLevel = useRef<ZoomLevel>("collapsed");
 
-  const collapsedLayout = useMemo(() => buildCollapsedGraph(graph), [graph]);
-  const expandedLayout = useMemo(() => buildExpandedGraph(graph), [graph]);
+  // Track which categories are expanded (double-click to toggle)
+  const [expandedCategories, setExpandedCategories] = useState<Set<NodeCategory>>(new Set());
 
-  const currentLayout = zoomLevel === "collapsed" ? collapsedLayout : expandedLayout;
+  // Undo/redo history for expandedCategories
+  const undoStack = useRef<Set<NodeCategory>[]>([]);
+  const redoStack = useRef<Set<NodeCategory>[]>([]);
 
-  const [nodes, setNodes, onNodesChange] = useNodesState(currentLayout.nodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(currentLayout.edges);
+  // Push current state to undo stack, clear redo, then apply new state
+  const pushExpansion = useCallback((next: Set<NodeCategory>) => {
+    setExpandedCategories((prev) => {
+      undoStack.current.push(prev);
+      redoStack.current = [];
+      return next;
+    });
+  }, []);
+
+  const clickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [animating, setAnimating] = useState(false);
+  const animTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fitViewTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Clean up pending timers on unmount
+  useEffect(() => {
+    return () => {
+      if (clickTimer.current) clearTimeout(clickTimer.current);
+      if (animTimer.current) clearTimeout(animTimer.current);
+      if (fitViewTimer.current) clearTimeout(fitViewTimer.current);
+    };
+  }, []);
+
+  const triggerAnimation = useCallback(() => {
+    setAnimating(true);
+    if (animTimer.current) clearTimeout(animTimer.current);
+    animTimer.current = setTimeout(() => setAnimating(false), 500);
+  }, []);
+
+  // Debounced fitView — cancels any pending call so rapid actions don't stack up
+  const scheduleFitView = useCallback(() => {
+    if (fitViewTimer.current) clearTimeout(fitViewTimer.current);
+    fitViewTimer.current = setTimeout(() => fitView({ padding: 0.12, duration: 400 }), 50);
+  }, [fitView]);
+
+  // All unique categories in the graph
+  const allCategories = useMemo(
+    () => new Set(graph.modules.map((m) => m.category)),
+    [graph]
+  );
+
+  // Compute the effective expanded set based on zoom level
+  const effectiveExpanded = useMemo(() => {
+    if (zoomLevel === "collapsed") {
+      // In collapsed mode, only show manually expanded groups
+      return expandedCategories;
+    }
+    // In compact/detailed mode, expand everything
+    return allCategories;
+  }, [zoomLevel, expandedCategories, allCategories]);
+
+  // Build the hybrid layout
+  const layout = useMemo(
+    () => buildHybridGraph(graph, effectiveExpanded),
+    [graph, effectiveExpanded]
+  );
+
+  const [nodes, setNodes, onNodesChange] = useNodesState(layout.nodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(layout.edges);
 
   // Watch viewport — only change zoom level if NOT locked
   useOnViewportChange({
@@ -69,22 +127,44 @@ function GraphCanvasInner({
     }, [locked]),
   });
 
-  // Swap nodes/edges when zoom level changes
+  // Cmd+Z / Cmd+Shift+Z to undo/redo expand/collapse
   useEffect(() => {
-    const layout = zoomLevel === "collapsed" ? collapsedLayout : expandedLayout;
+    function handleKeyDown(e: KeyboardEvent) {
+      if (!locked) return;
+      if (!e.metaKey || e.key.toLowerCase() !== "z") return;
+
+      const [popFrom, pushTo] = e.shiftKey
+        ? [redoStack.current, undoStack.current]
+        : [undoStack.current, redoStack.current];
+      const next = popFrom.pop();
+      if (next === undefined) return;
+      e.preventDefault();
+      triggerAnimation();
+      setExpandedCategories((cur) => { pushTo.push(cur); return next; });
+      scheduleFitView();
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [triggerAnimation, scheduleFitView, locked]);
+
+  // Track whether this is the first render (skip animation on mount)
+  const isInitialRender = useRef(true);
+
+  // Update nodes/edges when layout changes
+  useEffect(() => {
     setNodes(layout.nodes);
     setEdges(layout.edges);
-  }, [zoomLevel, collapsedLayout, expandedLayout, setNodes, setEdges]);
 
-  // Initial fit on graph load only
-  useEffect(() => {
-    setTimeout(() => fitView({ padding: 0.12, duration: 300 }), 100);
-  }, [graph, fitView]);
+    if (isInitialRender.current) {
+      // First render: quick fit, no node animation
+      isInitialRender.current = false;
+      setTimeout(() => fitView({ padding: 0.12, duration: 300 }), 100);
+    }
+  }, [layout, setNodes, setEdges, fitView]);
 
-  // Trace highlighting (expanded view only)
+  // Trace highlighting
   useEffect(() => {
-    if (zoomLevel === "collapsed" || !activeTrace) {
-      const layout = zoomLevel === "collapsed" ? collapsedLayout : expandedLayout;
+    if (!activeTrace) {
       setEdges(layout.edges);
       return;
     }
@@ -99,7 +179,7 @@ function GraphCanvasInner({
     }
 
     setEdges(
-      expandedLayout.edges.map((edge) => {
+      layout.edges.map((edge) => {
         const key = `${edge.source}->${edge.target}`;
         const isOnTrace = traceEdgeSet.has(key);
         return {
@@ -114,36 +194,85 @@ function GraphCanvasInner({
         };
       })
     );
-  }, [activeTrace, zoomLevel, graph.traces, expandedLayout, collapsedLayout, setEdges]);
+  }, [activeTrace, graph.traces, layout.edges, setEdges]);
 
+  // Single click: select node (delayed to avoid firing during double-click)
   const onNodeClick = useCallback(
     (_: React.MouseEvent, node: Node) => {
-      if (node.type === "groupNode") {
-        const members = (node.data as { members?: ArchModule[] })?.members;
-        if (members && members.length > 0) {
-          onNodeSelect(members[0]);
+      if (clickTimer.current) clearTimeout(clickTimer.current);
+      clickTimer.current = setTimeout(() => {
+        clickTimer.current = null;
+        if (node.type === "groupNode") {
+          const members = (node.data as { members?: ArchModule[] })?.members;
+          if (members && members.length > 0) {
+            onNodeSelect(members[0]);
+          }
+          return;
         }
-        return;
-      }
-      const mod = graph.modules.find((m) => m.id === node.id);
-      onNodeSelect(mod ?? null);
+        const mod = graph.modules.find((m) => m.id === node.id);
+        onNodeSelect(mod ?? null);
+      }, 250);
     },
     [graph.modules, onNodeSelect]
+  );
+
+  // Double-click: expand/collapse a group (cancels pending single-click)
+  const onNodeDoubleClick = useCallback(
+    (_: React.MouseEvent, node: Node) => {
+      if (clickTimer.current) {
+        clearTimeout(clickTimer.current);
+        clickTimer.current = null;
+      }
+
+      let next: Set<NodeCategory> | null = null;
+      if (node.type === "groupNode") {
+        const category = (node.data as GroupNodeData).category as NodeCategory;
+        next = new Set(expandedCategories);
+        next.add(category);
+      } else {
+        const mod = graph.modules.find((m) => m.id === node.id);
+        if (mod && expandedCategories.has(mod.category)) {
+          next = new Set(expandedCategories);
+          next.delete(mod.category);
+        }
+      }
+      if (!next) return;
+      triggerAnimation();
+      pushExpansion(next);
+      onNodeSelect(null);
+      scheduleFitView();
+    },
+    [graph.modules, expandedCategories, onNodeSelect, triggerAnimation, pushExpansion, scheduleFitView]
   );
 
   const onPaneClick = useCallback(() => {
     onNodeSelect(null);
   }, [onNodeSelect]);
 
-  // Manual level change from slider
+  // Slider level change
   function handleLevelChange(level: ZoomLevel) {
     prevZoomLevel.current = level;
     setZoomLevel(level);
+    // When switching to system view, clear all expansions
+    if (level === "collapsed") {
+      setExpandedCategories(new Set());
+    }
+    // When switching to module/detail, expand all
+    if (level === "compact" || level === "detailed") {
+      setExpandedCategories(new Set(allCategories));
+    }
   }
+
+  // Slider shows "collapsed" unless all groups are expanded
+  const isFullyExpanded = effectiveExpanded.size === allCategories.size;
+  const displayLevel: ZoomLevel = isFullyExpanded
+    ? (zoomLevel === "detailed" ? "detailed" : "compact")
+    : "collapsed";
 
   return (
     <>
       <ReactFlow
+        className={animating ? "react-flow--animating" : undefined}
         nodes={nodes.map((n) => {
           const isSelected = n.id === selectedNodeId ||
             (n.type === "groupNode" && selectedNodeId
@@ -159,6 +288,7 @@ function GraphCanvasInner({
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onNodeClick={onNodeClick}
+        onNodeDoubleClick={onNodeDoubleClick}
         onPaneClick={onPaneClick}
         nodeTypes={nodeTypes}
         fitView
@@ -172,9 +302,8 @@ function GraphCanvasInner({
         <Controls position="bottom-left" showInteractive={false} />
       </ReactFlow>
 
-      {/* Detail level slider — bottom right */}
       <DetailSlider
-        level={zoomLevel}
+        level={displayLevel}
         locked={locked}
         onLevelChange={handleLevelChange}
         onLockedChange={setLocked}
