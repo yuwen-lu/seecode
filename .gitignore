@@ -39,3 +39,16 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# cloned repos (for analysis)
+/clicky/
+/tmp-repos/
+
+# prototype artifacts
+/prototype/
+
+# claude code
+.claude/
+
+# screenshots from testing
+*.png
