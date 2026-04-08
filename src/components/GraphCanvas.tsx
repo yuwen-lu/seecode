@@ -1,23 +1,30 @@
 "use client";
 
-import { useCallback, useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ReactFlow,
   Background,
   Controls,
-  MiniMap,
   useNodesState,
   useEdgesState,
   useReactFlow,
+  useOnViewportChange,
   ReactFlowProvider,
   type Node,
   type Edge,
+  type Viewport,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import dagre from "dagre";
 import type { ArchGraph, ArchModule } from "@/types/graph";
-import { CATEGORY_COLORS } from "@/types/graph";
 import { ArchNode } from "./ArchNode";
+import { GroupNode } from "./GroupNode";
+import { DetailSlider } from "./DetailSlider";
+import {
+  getZoomLevel,
+  buildCollapsedGraph,
+  buildExpandedGraph,
+  type ZoomLevel,
+} from "@/lib/semantic-zoom";
 
 interface GraphCanvasProps {
   graph: ArchGraph;
@@ -26,58 +33,10 @@ interface GraphCanvasProps {
   selectedNodeId: string | null;
 }
 
-const nodeTypes = { archNode: ArchNode };
-
-const NODE_WIDTH = 220;
-const NODE_HEIGHT = 80;
-
-function layoutGraph(graph: ArchGraph): { nodes: Node[]; edges: Edge[] } {
-  const g = new dagre.graphlib.Graph();
-  g.setDefaultEdgeLabel(() => ({}));
-  g.setGraph({ rankdir: "TB", nodesep: 60, ranksep: 80, marginx: 40, marginy: 40 });
-
-  for (const mod of graph.modules) {
-    g.setNode(mod.id, { width: NODE_WIDTH, height: NODE_HEIGHT });
-  }
-
-  for (const edge of graph.edges) {
-    g.setEdge(edge.from, edge.to);
-  }
-
-  dagre.layout(g);
-
-  const nodes: Node[] = graph.modules.map((mod) => {
-    const pos = g.node(mod.id);
-    return {
-      id: mod.id,
-      type: "archNode",
-      position: { x: pos.x - NODE_WIDTH / 2, y: pos.y - NODE_HEIGHT / 2 },
-      data: { module: mod },
-    };
-  });
-
-  const edges: Edge[] = graph.edges.map((edge, i) => ({
-    id: `e-${i}`,
-    source: edge.from,
-    target: edge.to,
-    label: edge.label,
-    type: "default",
-    animated: edge.type === "dataflow",
-    style: {
-      stroke:
-        edge.type === "weak"
-          ? "#3a3a55"
-          : edge.type === "dataflow"
-          ? "#7aa2f7"
-          : "#5a6080",
-      strokeWidth: edge.type === "dataflow" ? 2.5 : 1.5,
-      strokeDasharray: edge.type === "weak" ? "6 3" : undefined,
-    },
-    labelStyle: { fill: "#888", fontSize: 10 },
-  }));
-
-  return { nodes, edges };
-}
+const nodeTypes = {
+  archNode: ArchNode,
+  groupNode: GroupNode,
+};
 
 function GraphCanvasInner({
   graph,
@@ -86,26 +45,47 @@ function GraphCanvasInner({
   selectedNodeId,
 }: GraphCanvasProps) {
   const { fitView } = useReactFlow();
-  const { nodes: layoutNodes, edges: layoutEdges } = useMemo(
-    () => layoutGraph(graph),
-    [graph]
-  );
+  const [zoomLevel, setZoomLevel] = useState<ZoomLevel>("compact");
+  const [locked, setLocked] = useState(false);
+  const prevZoomLevel = useRef<ZoomLevel>("compact");
 
-  const [nodes, setNodes, onNodesChange] = useNodesState(layoutNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(layoutEdges);
+  const collapsedLayout = useMemo(() => buildCollapsedGraph(graph), [graph]);
+  const expandedLayout = useMemo(() => buildExpandedGraph(graph), [graph]);
 
-  // Update nodes/edges when graph changes
+  const currentLayout = zoomLevel === "collapsed" ? collapsedLayout : expandedLayout;
+
+  const [nodes, setNodes, onNodesChange] = useNodesState(currentLayout.nodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(currentLayout.edges);
+
+  // Watch viewport — only change zoom level if NOT locked
+  useOnViewportChange({
+    onChange: useCallback((viewport: Viewport) => {
+      if (locked) return;
+      const newLevel = getZoomLevel(viewport.zoom);
+      if (newLevel !== prevZoomLevel.current) {
+        prevZoomLevel.current = newLevel;
+        setZoomLevel(newLevel);
+      }
+    }, [locked]),
+  });
+
+  // Swap nodes/edges when zoom level changes
   useEffect(() => {
-    setNodes(layoutNodes);
-    setEdges(layoutEdges);
-    // Fit view after layout
-    setTimeout(() => fitView({ padding: 0.1, duration: 300 }), 100);
-  }, [layoutNodes, layoutEdges, setNodes, setEdges, fitView]);
+    const layout = zoomLevel === "collapsed" ? collapsedLayout : expandedLayout;
+    setNodes(layout.nodes);
+    setEdges(layout.edges);
+  }, [zoomLevel, collapsedLayout, expandedLayout, setNodes, setEdges]);
 
-  // Highlight trace edges
+  // Initial fit on graph load only
   useEffect(() => {
-    if (!activeTrace) {
-      setEdges(layoutEdges);
+    setTimeout(() => fitView({ padding: 0.12, duration: 300 }), 100);
+  }, [graph, fitView]);
+
+  // Trace highlighting (expanded view only)
+  useEffect(() => {
+    if (zoomLevel === "collapsed" || !activeTrace) {
+      const layout = zoomLevel === "collapsed" ? collapsedLayout : expandedLayout;
+      setEdges(layout.edges);
       return;
     }
 
@@ -119,7 +99,7 @@ function GraphCanvasInner({
     }
 
     setEdges(
-      layoutEdges.map((edge) => {
+      expandedLayout.edges.map((edge) => {
         const key = `${edge.source}->${edge.target}`;
         const isOnTrace = traceEdgeSet.has(key);
         return {
@@ -134,10 +114,17 @@ function GraphCanvasInner({
         };
       })
     );
-  }, [activeTrace, graph.traces, layoutEdges, setEdges]);
+  }, [activeTrace, zoomLevel, graph.traces, expandedLayout, collapsedLayout, setEdges]);
 
   const onNodeClick = useCallback(
     (_: React.MouseEvent, node: Node) => {
+      if (node.type === "groupNode") {
+        const members = (node.data as { members?: ArchModule[] })?.members;
+        if (members && members.length > 0) {
+          onNodeSelect(members[0]);
+        }
+        return;
+      }
       const mod = graph.modules.find((m) => m.id === node.id);
       onNodeSelect(mod ?? null);
     },
@@ -148,48 +135,67 @@ function GraphCanvasInner({
     onNodeSelect(null);
   }, [onNodeSelect]);
 
+  // Manual level change from slider
+  function handleLevelChange(level: ZoomLevel) {
+    prevZoomLevel.current = level;
+    setZoomLevel(level);
+  }
+
   return (
-    <ReactFlow
-      nodes={nodes.map((n) => ({
-        ...n,
-        selected: n.id === selectedNodeId,
-      }))}
-      edges={edges}
-      onNodesChange={onNodesChange}
-      onEdgesChange={onEdgesChange}
-      onNodeClick={onNodeClick}
-      onPaneClick={onPaneClick}
-      nodeTypes={nodeTypes}
-      fitView
-      fitViewOptions={{ padding: 0.1 }}
-      minZoom={0.1}
-      maxZoom={3}
-      panOnScroll
-      selectionOnDrag
-      panOnDrag={[1, 2]}
-      selectionMode={1}
-      zoomOnScroll={false}
-      zoomOnPinch
-      zoomOnDoubleClick={false}
-      proOptions={{ hideAttribution: true }}
-    >
-      <Background color="#1a1a2a" gap={20} size={1} />
-      <Controls position="bottom-left" />
-      <MiniMap
-        position="bottom-right"
-        nodeColor={(node) => {
-          const mod = node.data?.module as ArchModule | undefined;
-          return mod ? CATEGORY_COLORS[mod.category]?.border ?? "#64748b" : "#64748b";
-        }}
-        maskColor="rgba(0, 0, 0, 0.7)"
-        pannable
-        zoomable
+    <>
+      <ReactFlow
+        nodes={nodes.map((n) => {
+          const isSelected = n.id === selectedNodeId ||
+            (n.type === "groupNode" && selectedNodeId
+              ? ((n.data as { members?: ArchModule[] })?.members ?? []).some((m) => m.id === selectedNodeId)
+              : false);
+          return {
+            ...n,
+            selected: isSelected,
+            data: { ...n.data, dimmed: !!selectedNodeId && !isSelected },
+          };
+        })}
+        edges={edges}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        onNodeClick={onNodeClick}
+        onPaneClick={onPaneClick}
+        nodeTypes={nodeTypes}
+        fitView
+        fitViewOptions={{ padding: 0.12 }}
+        minZoom={0.1}
+        maxZoom={3}
+        panOnScroll
+        proOptions={{ hideAttribution: true }}
+      >
+        <Background color="#1a1a2a" gap={20} size={1} />
+        <Controls position="bottom-left" showInteractive={false} />
+      </ReactFlow>
+
+      {/* Detail level slider — bottom right */}
+      <DetailSlider
+        level={zoomLevel}
+        locked={locked}
+        onLevelChange={handleLevelChange}
+        onLockedChange={setLocked}
       />
-    </ReactFlow>
+    </>
   );
 }
 
 export function GraphCanvas(props: GraphCanvasProps) {
+  if (!props.graph.modules || props.graph.modules.length === 0) {
+    return (
+      <div className="h-full w-full flex items-center justify-center">
+        <div className="text-center max-w-sm">
+          <p className="text-text-secondary text-sm">
+            No modules to display. The graph is empty.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <ReactFlowProvider>
       <GraphCanvasInner {...props} />

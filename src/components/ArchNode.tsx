@@ -7,6 +7,7 @@ import { CATEGORY_COLORS, CATEGORY_LABELS } from "@/types/graph";
 
 interface ArchNodeData {
   module: ArchModule;
+  dimmed?: boolean;
 }
 
 export const ArchNode = memo(function ArchNode({
@@ -17,7 +18,7 @@ export const ArchNode = memo(function ArchNode({
   selected?: boolean;
 }) {
   const { zoom } = useViewport();
-  const { module: mod } = data;
+  const { module: mod, dimmed } = data;
   const colors = CATEGORY_COLORS[mod.category];
 
   // Semantic zoom levels
@@ -28,13 +29,11 @@ export const ArchNode = memo(function ArchNode({
     <>
       <Handle type="target" position={Position.Top} className="!bg-transparent !border-0 !w-2 !h-2" />
       <div
-        className="rounded-lg px-3 py-2 min-w-[180px] max-w-[260px] transition-shadow"
+        className="rounded-lg px-3 py-2 min-w-[180px] max-w-[260px]"
         style={{
           background: colors.bg,
           border: `2px solid ${selected ? colors.border : colors.border + "88"}`,
-          boxShadow: selected
-            ? `0 0 16px ${colors.border}33`
-            : "0 2px 8px rgba(0,0,0,0.3)",
+          opacity: dimmed ? 0.25 : 1,
         }}
       >
         {/* Header: name + category badge */}
