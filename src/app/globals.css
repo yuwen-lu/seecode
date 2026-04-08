@@ -68,3 +68,12 @@ body {
 .react-flow__controls button:hover {
   background: var(--surface-2) !important;
 }
+
+/* Hide scrollbar for streaming loader */
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.hide-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}

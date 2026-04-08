@@ -43,6 +43,7 @@ export interface ArchGraph {
   modules: ArchModule[];
   edges: ArchEdge[];
   traces: DataTrace[];
+  mermaid?: string; // Raw Mermaid source for debug view
 }
 
 /** Category → color mapping */
