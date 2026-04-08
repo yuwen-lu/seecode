@@ -1,7 +1,13 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  serverExternalPackages: [
+    "tree-sitter",
+    "tree-sitter-typescript",
+    "tree-sitter-python",
+    "tree-sitter-go",
+    "tree-sitter-rust",
+  ],
 };
 
 export default nextConfig;
