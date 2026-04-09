@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
-import { Send, X, FileText, Loader2, MessageCircle, Minus } from "lucide-react";
+import { Send, X, FileText, Loader2, MessageCircle, Minus, Plus } from "lucide-react";
 import Markdown from "react-markdown";
 import { useChatStore } from "@/store/chat-store";
 import { buildFileIndex } from "@/lib/chat-references";
@@ -22,7 +22,7 @@ export function ChatPanel({ modules, onFileClick }: ChatPanelProps) {
   const canvasContext = useChatStore((s) => s.canvasContext);
 
   const [input, setInput] = useState("");
-  const [height, setHeight] = useState(400);
+  const [height, setHeight] = useState(() => typeof window !== "undefined" ? Math.round(window.innerHeight * 0.7) : 500);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -174,7 +174,7 @@ export function ChatPanel({ modules, onFileClick }: ChatPanelProps) {
       {!isOpen && (
         <button
           onClick={toggleOpen}
-          className="fixed bottom-5 right-5 z-40 p-3 rounded-full bg-surface-1 border border-border text-text-secondary hover:text-foreground hover:border-accent/50 transition-all shadow-lg shadow-black/30"
+          className="fixed bottom-5 right-5 z-40 p-3 rounded-full bg-surface-1 border border-border text-text-secondary hover:text-foreground hover:border-accent/50 transition-all shadow-lg shadow-black/30 cursor-pointer"
         >
           <MessageCircle size={18} />
         </button>
@@ -197,13 +197,13 @@ export function ChatPanel({ modules, onFileClick }: ChatPanelProps) {
             <span className="text-xs font-medium text-text-secondary truncate">
               Chat
             </span>
-            <div className="flex items-center gap-1 shrink-0">
+            <div className="flex items-center gap-0.5 shrink-0">
               {messages.length > 0 && (
-                <button onClick={clearChat} className="text-[10px] text-text-tertiary hover:text-text-secondary px-1.5 py-0.5 transition-colors">
-                  Clear
+                <button onClick={clearChat} className="p-1 text-text-tertiary hover:text-text-secondary transition-colors cursor-pointer" title="New chat">
+                  <Plus size={14} />
                 </button>
               )}
-              <button onClick={() => setOpen(false)} className="p-1 text-text-tertiary hover:text-text-secondary transition-colors">
+              <button onClick={() => setOpen(false)} className="p-1 text-text-tertiary hover:text-text-secondary transition-colors cursor-pointer" title="Minimize">
                 <Minus size={14} />
               </button>
             </div>
