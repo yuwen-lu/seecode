@@ -20,11 +20,10 @@ export default function Home() {
   const [streamedText, setStreamedText] = useState("");
   const abortRef = useRef<AbortController | null>(null);
 
-  // Panel depth + highlight override driven by panel navigation
-  const [panelDepth, setPanelDepth] = useState<PanelDepth | null>(null);
+  // When the panel navigates to a module (e.g., from component view),
+  // override the highlight so the canvas shows which node/group is relevant
   const [highlightOverride, setHighlightOverride] = useState<string | null>(null);
 
-  // Derive the selected node ID for canvas highlighting
   const selectedNodeId = highlightOverride
     ?? (selection
       ? selection.kind === "module"
@@ -32,17 +31,15 @@ export default function Home() {
         : `group-${selection.category}`
       : null);
 
-  // Called by DetailPanel whenever its view changes
-  const onPanelViewChange = useCallback((depth: PanelDepth, moduleId: string | null) => {
-    setPanelDepth(depth);
+  // Panel reports its view changes — we only use this for highlight override
+  const onPanelViewChange = useCallback((_depth: PanelDepth, moduleId: string | null) => {
     setHighlightOverride(moduleId);
   }, []);
 
-  // Clear override when selection changes from the canvas
+  // Selection from canvas click — clears any panel highlight override
   const handleSelect = useCallback((sel: PanelSelection | null) => {
     setSelection(sel);
     setHighlightOverride(null);
-    setPanelDepth(sel ? (sel.kind === "component" ? "component" : "module") : null);
   }, []);
 
   async function analyzeRepo(url: string) {
@@ -201,7 +198,6 @@ export default function Home() {
               activeTrace={activeTrace}
               onSelect={handleSelect}
               selectedNodeId={selectedNodeId}
-              panelDepth={panelDepth}
             />
           )}
 
