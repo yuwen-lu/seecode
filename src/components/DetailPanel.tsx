@@ -171,9 +171,9 @@ function PanelHeader({
       </div>
       <button
         onClick={onClose}
-        className="text-text-secondary hover:text-foreground text-lg px-1 cursor-pointer shrink-0"
+        className="text-text-tertiary hover:text-foreground p-1 rounded hover:bg-surface-2 transition-colors cursor-pointer shrink-0"
       >
-        &times;
+        <X size={14} />
       </button>
     </div>
   );
@@ -642,7 +642,7 @@ function CodeLightbox({
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
-    <h3 className="text-[11px] font-semibold uppercase tracking-wider text-accent mb-1.5 shrink-0">
+    <h3 className="text-[10px] font-medium uppercase tracking-wider text-text-tertiary mb-1.5 shrink-0">
       {children}
     </h3>
   );
