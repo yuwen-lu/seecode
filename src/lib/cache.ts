@@ -49,6 +49,45 @@ export function cacheGraph(graph: ArchGraph): void {
   }
 }
 
+export interface CachedRepoEntry {
+  repoUrl: string;
+  repoName: string;
+  analyzedAt: string;
+}
+
+/**
+ * List all distinct repos that have been analyzed, most recent first.
+ */
+export function listCachedRepos(): CachedRepoEntry[] {
+  try {
+    const rows = getDb()
+      .prepare(`
+        SELECT repo_url, graph_json, created_at
+        FROM analysis_cache
+        ORDER BY created_at DESC
+      `)
+      .all() as { repo_url: string; graph_json: string; created_at: string }[];
+
+    const seen = new Map<string, CachedRepoEntry>();
+    for (const row of rows) {
+      if (seen.has(row.repo_url)) continue;
+      try {
+        const graph = JSON.parse(row.graph_json) as ArchGraph;
+        seen.set(row.repo_url, {
+          repoUrl: row.repo_url,
+          repoName: graph.repoName,
+          analyzedAt: graph.analyzedAt ?? row.created_at,
+        });
+      } catch {
+        // Skip malformed entries
+      }
+    }
+    return Array.from(seen.values());
+  } catch {
+    return [];
+  }
+}
+
 /**
  * Check if a repo URL has any cached analysis (regardless of commit SHA).
  * Returns the latest cached graph if available.
