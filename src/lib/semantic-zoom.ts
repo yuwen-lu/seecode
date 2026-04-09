@@ -41,11 +41,11 @@ function makeEdgeStyle(edge: ArchEdge) {
   return {
     stroke:
       edge.type === "weak"
-        ? "#3a3a55"
+        ? "#2a2a40"
         : edge.type === "dataflow"
-        ? "#7aa2f7"
-        : "#5a6080",
-    strokeWidth: edge.type === "dataflow" ? 2.5 : 1.5,
+        ? "#4a6a9f"
+        : "#3a3a55",
+    strokeWidth: edge.type === "dataflow" ? 2 : 1.2,
     strokeDasharray: edge.type === "weak" ? "6 3" : undefined,
   };
 }
@@ -138,7 +138,10 @@ export function buildHybridGraph(
       type: "default",
       animated: edge.type === "dataflow",
       style: makeEdgeStyle(edge),
-      labelStyle: { fill: "#888", fontSize: 10 },
+      labelStyle: { fill: "#555", fontSize: 9, fontWeight: 400 },
+      labelBgStyle: { fill: "#0a0a0f", fillOpacity: 0.85 },
+      labelBgPadding: [4, 2] as [number, number],
+      labelBgBorderRadius: 3,
     });
   }
 

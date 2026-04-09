@@ -33,9 +33,7 @@ export const ArchNode = memo(function ArchNode({
         className="rounded-lg px-3 py-2 min-w-[180px] max-w-[260px]"
         style={{
           background: colors.bg,
-          boxShadow: selected
-            ? `0 0 0 1.5px ${colors.border}`
-            : `0 1px 3px rgba(0,0,0,0.3), inset 0 1px 0 ${colors.border}44`,
+          boxShadow: `0 1px 3px rgba(0,0,0,0.3), inset 0 1px 0 ${colors.border}44`,
           opacity: dimmed ? 0.25 : 1,
         }}
       >

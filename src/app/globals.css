@@ -88,6 +88,31 @@ body {
               opacity 0.3s ease;
 }
 
+/* Edge transitions — smooth opacity for selection dimming */
+.react-flow__edge {
+  transition: opacity 0.3s ease;
+}
+/* During seeding, hide edges completely */
+.react-flow--seeding .react-flow__edge {
+  opacity: 0 !important;
+  transition: none !important;
+}
+/* During morph, edges fade in with delay after nodes settle */
+.react-flow--morphing .react-flow__edge {
+  opacity: 0;
+  animation: edge-fade-in 0.35s ease 0.35s forwards;
+}
+
+@keyframes edge-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Edge labels — quieter styling */
+.react-flow__edgelabel-renderer span {
+  font-family: var(--font-sans), system-ui, sans-serif;
+}
+
 /* Shiki code blocks */
 .shiki-container pre {
   margin: 0;

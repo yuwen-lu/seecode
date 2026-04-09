@@ -395,7 +395,25 @@ function GraphCanvasInner({
             data: { ...n.data, dimmed: dimmedBySelection || dimmedByTrace, zoomLevel },
           };
         })}
-        edges={edges}
+        edges={edges.map((e) => {
+          if (!selectedNodeId && !traceNodeIds) return e;
+          // When a node is selected, only highlight edges connected to it
+          if (selectedNodeId) {
+            const connected = e.source === selectedNodeId || e.target === selectedNodeId ||
+              // Also check if edge connects to a group containing the selected module
+              nodes.some((n) =>
+                n.type === "groupNode" &&
+                (n.id === e.source || n.id === e.target) &&
+                ((n.data as { members?: ArchModule[] })?.members ?? []).some((m) => m.id === selectedNodeId)
+              );
+            return {
+              ...e,
+              style: { ...e.style, opacity: connected ? 1 : 0.08 },
+              labelStyle: { ...e.labelStyle, opacity: connected ? 1 : 0 },
+            };
+          }
+          return e;
+        })}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onNodeClick={onNodeClick}
