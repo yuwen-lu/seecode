@@ -15,7 +15,7 @@ export function getZoomLevel(zoom: number): ZoomLevel {
 const GROUP_NODE_WIDTH = 260;
 const GROUP_NODE_HEIGHT = 120;
 const NODE_WIDTH = 220;
-const NODE_HEIGHT = 80;
+const NODE_HEIGHT = 140;
 
 function buildGroupDescription(members: ArchModule[]): string {
   if (members.length === 1) return members[0].responsibility;
