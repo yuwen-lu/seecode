@@ -1,20 +1,56 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Copy, Check, ChevronRight } from "lucide-react";
-import type { ArchModule, PanelSelection } from "@/types/graph";
+import { Copy, Check, ChevronRight, ChevronLeft } from "lucide-react";
+import type { ArchModule, PanelSelection, NodeCategory } from "@/types/graph";
 import { CATEGORY_COLORS, CATEGORY_LABELS } from "@/types/graph";
+
+type PanelView =
+  | { level: "component"; category: NodeCategory; label: string; members: ArchModule[] }
+  | { level: "module"; module: ArchModule }
+  | { level: "file"; module: ArchModule; file: string };
+
+export type PanelDepth = "component" | "module" | "file";
 
 interface DetailPanelProps {
   selection: PanelSelection;
   sourceSnippets?: Record<string, string>;
   onClose: () => void;
-  onDrillToModule: (mod: ArchModule) => void;
+  onViewChange: (depth: PanelDepth, moduleId: string | null) => void;
 }
 
-export function DetailPanel({ selection, sourceSnippets, onClose, onDrillToModule }: DetailPanelProps) {
+export function DetailPanel({ selection, sourceSnippets, onClose, onViewChange }: DetailPanelProps) {
   const [width, setWidth] = useState(400);
   const isResizing = useRef(false);
+
+  // Internal navigation stack
+  const [viewStack, setViewStack] = useState<PanelView[]>(() => selectionToView(selection));
+
+  // Sync when external selection changes
+  useEffect(() => {
+    setViewStack(selectionToView(selection));
+  }, [selection]);
+
+  const currentView = viewStack[viewStack.length - 1];
+
+  // Notify parent whenever the current view changes
+  useEffect(() => {
+    const moduleId = currentView.level === "component" ? null
+      : currentView.level === "module" ? currentView.module.id
+      : currentView.module.id;
+    onViewChange(currentView.level, moduleId);
+  }, [currentView]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const pushView = useCallback((view: PanelView) => {
+    setViewStack((prev) => [...prev, view]);
+  }, []);
+
+  const goBack = useCallback(() => {
+    if (viewStack.length <= 1) return;
+    setViewStack(viewStack.slice(0, -1));
+  }, [viewStack]);
+
+  const canGoBack = viewStack.length > 1;
 
   const onMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -49,92 +85,137 @@ export function DetailPanel({ selection, sourceSnippets, onClose, onDrillToModul
         onMouseDown={onMouseDown}
       />
 
-      {selection.kind === "component" ? (
-        <ComponentView
-          selection={selection}
-          onClose={onClose}
-          onDrillToModule={onDrillToModule}
-        />
-      ) : (
-        <ModuleView
-          module={selection.module}
+      {/* Header */}
+      <PanelHeader
+        view={currentView}
+        canGoBack={canGoBack}
+        onBack={goBack}
+        onClose={onClose}
+      />
+
+      {/* Body */}
+      {currentView.level === "component" && (
+        <ComponentBody view={currentView} onSelectModule={(mod) => pushView({ level: "module", module: mod })} />
+      )}
+      {currentView.level === "module" && (
+        <ModuleBody
+          module={currentView.module}
           sourceSnippets={sourceSnippets}
-          onClose={onClose}
+          onSelectFile={(file) => pushView({ level: "file", module: currentView.module, file })}
+        />
+      )}
+      {currentView.level === "file" && (
+        <FileBody
+          module={currentView.module}
+          file={currentView.file}
+          sourceSnippets={sourceSnippets}
         />
       )}
     </div>
   );
 }
 
-/* ─── Component-level view ─── */
+function selectionToView(sel: PanelSelection): PanelView[] {
+  if (sel.kind === "component") {
+    return [{ level: "component", category: sel.category, label: sel.label, members: sel.members }];
+  }
+  return [{ level: "module", module: sel.module }];
+}
 
-function ComponentView({
-  selection,
+/* ─── Header ─── */
+
+function PanelHeader({
+  view,
+  canGoBack,
+  onBack,
   onClose,
-  onDrillToModule,
 }: {
-  selection: Extract<PanelSelection, { kind: "component" }>;
+  view: PanelView;
+  canGoBack: boolean;
+  onBack: () => void;
   onClose: () => void;
-  onDrillToModule: (mod: ArchModule) => void;
 }) {
-  const colors = CATEGORY_COLORS[selection.category];
-  const totalLines = selection.members.reduce((sum, m) => sum + (m.lineCount ?? 0), 0);
-  const totalFiles = selection.members.reduce((sum, m) => sum + m.files.length, 0);
+  const category = view.level === "component" ? view.category : view.module.category;
+  const colors = CATEGORY_COLORS[category];
+
+  let title: string;
+  if (view.level === "component") title = view.label;
+  else if (view.level === "module") title = view.module.name;
+  else title = view.file.split("/").pop() ?? view.file;
 
   return (
-    <>
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
-        <div className="flex items-center gap-2 min-w-0">
-          <h2 className="text-sm font-semibold text-foreground truncate">
-            {selection.label}
-          </h2>
-          <span
-            className="text-[10px] px-1.5 py-0.5 rounded font-medium shrink-0"
-            style={{
-              background: colors.border + "22",
-              color: colors.border,
-              border: `1px solid ${colors.border}44`,
-            }}
+    <div className="flex items-center justify-between px-3 py-2.5 border-b border-border shrink-0 gap-2">
+      <div className="flex items-center gap-1.5 min-w-0">
+        {canGoBack && (
+          <button
+            onClick={onBack}
+            className="shrink-0 cursor-pointer text-text-tertiary hover:text-foreground p-0.5 -ml-0.5"
           >
-            {CATEGORY_LABELS[selection.category]}
-          </span>
-        </div>
-        <button
-          onClick={onClose}
-          className="text-text-secondary hover:text-foreground text-lg px-1 cursor-pointer"
+            <ChevronLeft size={16} />
+          </button>
+        )}
+        <h2 className="text-sm font-semibold text-foreground truncate">
+          {title}
+        </h2>
+        <span
+          className="text-[10px] px-1.5 py-0.5 rounded font-medium shrink-0"
+          style={{
+            background: colors.border + "22",
+            color: colors.border,
+            border: `1px solid ${colors.border}44`,
+          }}
         >
-          &times;
-        </button>
+          {view.level === "file" ? "File" : CATEGORY_LABELS[category]}
+        </span>
+      </div>
+      <button
+        onClick={onClose}
+        className="text-text-secondary hover:text-foreground text-lg px-1 cursor-pointer shrink-0"
+      >
+        &times;
+      </button>
+    </div>
+  );
+}
+
+/* ─── Component-level body ─── */
+
+function ComponentBody({
+  view,
+  onSelectModule,
+}: {
+  view: Extract<PanelView, { level: "component" }>;
+  onSelectModule: (mod: ArchModule) => void;
+}) {
+  const totalLines = view.members.reduce((sum, m) => sum + (m.lineCount ?? 0), 0);
+  const totalFiles = view.members.reduce((sum, m) => sum + m.files.length, 0);
+
+  return (
+    <div className="flex-1 overflow-y-auto px-4 py-3 text-[13px] leading-relaxed">
+      <div className="text-[11px] text-text-tertiary mb-3">
+        {view.members.length} module{view.members.length !== 1 ? "s" : ""}
+        {totalFiles > 0 ? ` · ${totalFiles} files` : ""}
+        {totalLines > 0 ? ` · ${totalLines.toLocaleString()} lines` : ""}
       </div>
 
-      {/* Body */}
-      <div className="flex-1 overflow-y-auto px-4 py-3 text-[13px] leading-relaxed">
-        {/* Stats */}
-        <div className="text-[11px] text-text-tertiary mb-3">
-          {selection.members.length} module{selection.members.length !== 1 ? "s" : ""}
-          {totalFiles > 0 ? ` · ${totalFiles} files` : ""}
-          {totalLines > 0 ? ` · ${totalLines.toLocaleString()} lines` : ""}
-        </div>
-
-        {/* Module list */}
-        <SectionTitle>Modules</SectionTitle>
-        <div className="space-y-1.5">
-          {selection.members.map((mod) => (
-            <button
-              key={mod.id}
-              onClick={() => onDrillToModule(mod)}
-              className="w-full text-left rounded-lg px-3 py-2.5 cursor-pointer transition-colors hover:bg-surface-2 group border border-border/50 hover:border-border"
-            >
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-xs font-semibold text-foreground truncate">
-                  {mod.name}
-                </span>
-                <ChevronRight size={14} className="shrink-0 text-text-tertiary group-hover:text-accent transition-colors" />
-              </div>
-              <p className="text-[11px] text-text-secondary mt-0.5 line-clamp-2">
-                {mod.responsibility}
-              </p>
+      <SectionTitle>Modules</SectionTitle>
+      <div className="space-y-1.5">
+        {view.members.map((mod) => (
+          <button
+            key={mod.id}
+            onClick={() => onSelectModule(mod)}
+            className="w-full text-left rounded-lg px-3 py-2.5 cursor-pointer transition-colors hover:bg-surface-2 group border border-border/50 hover:border-border"
+          >
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-semibold text-foreground truncate">
+                {mod.name}
+              </span>
+              <ChevronRight size={14} className="shrink-0 text-text-tertiary group-hover:text-accent transition-colors" />
+            </div>
+            <p className="text-[11px] text-text-secondary mt-0.5 line-clamp-2">
+              {mod.responsibility}
+            </p>
+            {mod.keyTypes.length > 0 && (
               <div className="flex flex-wrap gap-1 mt-1.5">
                 {mod.keyTypes.slice(0, 3).map((t) => (
                   <span
@@ -150,189 +231,174 @@ function ComponentView({
                   </span>
                 )}
               </div>
-              <div className="text-[10px] text-text-tertiary mt-1">
-                {mod.files.length} file{mod.files.length !== 1 ? "s" : ""}
-                {mod.lineCount ? ` · ${mod.lineCount.toLocaleString()} lines` : ""}
-              </div>
-            </button>
-          ))}
-        </div>
+            )}
+            <div className="text-[10px] text-text-tertiary mt-1">
+              {mod.files.length} file{mod.files.length !== 1 ? "s" : ""}
+              {mod.lineCount ? ` · ${mod.lineCount.toLocaleString()} lines` : ""}
+            </div>
+          </button>
+        ))}
       </div>
-    </>
+    </div>
   );
 }
 
-/* ─── Module-level view ─── */
+/* ─── Module-level body ─── */
 
-function ModuleView({
+function ModuleBody({
   module: mod,
   sourceSnippets,
-  onClose,
+  onSelectFile,
 }: {
   module: ArchModule;
   sourceSnippets?: Record<string, string>;
-  onClose: () => void;
+  onSelectFile: (file: string) => void;
 }) {
-  const colors = CATEGORY_COLORS[mod.category];
-  const [activeFile, setActiveFile] = useState<string | null>(
-    mod.files.length > 0 ? mod.files[0] : null
+  return (
+    <div className="flex-1 overflow-y-auto px-4 py-3 text-[13px] leading-relaxed space-y-4">
+      {/* Responsibility */}
+      <p className="text-text-secondary">{mod.responsibility}</p>
+
+      {/* Files */}
+      {mod.files.length > 0 && (
+        <div>
+          <SectionTitle>Files</SectionTitle>
+          <div className="space-y-0.5">
+            {mod.files.map((f) => {
+              const hasSource = !!sourceSnippets?.[f];
+              return (
+                <button
+                  key={f}
+                  onClick={() => hasSource && onSelectFile(f)}
+                  className={`flex items-center justify-between gap-2 text-[11px] font-mono w-full px-1.5 py-1 rounded transition-colors ${
+                    hasSource
+                      ? "text-text-tertiary hover:text-text-secondary hover:bg-surface-2 cursor-pointer group"
+                      : "text-text-tertiary"
+                  }`}
+                >
+                  <span className="truncate">{f}</span>
+                  {hasSource && (
+                    <ChevronRight size={12} className="shrink-0 text-text-tertiary group-hover:text-accent opacity-0 group-hover:opacity-100 transition-opacity" />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+          {mod.lineCount != null && mod.lineCount > 0 && (
+            <p className="text-[11px] text-text-tertiary mt-1">
+              {mod.lineCount.toLocaleString()} lines total
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Key Types */}
+      {mod.keyTypes.length > 0 && (
+        <div>
+          <SectionTitle>Key Types</SectionTitle>
+          <div className="flex flex-wrap gap-1.5">
+            {mod.keyTypes.map((t) => (
+              <span
+                key={t}
+                className="text-xs font-mono px-2 py-0.5 rounded bg-surface-2 text-accent"
+              >
+                {t}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Key Methods */}
+      {mod.keyMethods.length > 0 && (
+        <div>
+          <SectionTitle>Key Methods</SectionTitle>
+          <ul className="space-y-0.5">
+            {mod.keyMethods.map((m) => (
+              <li key={m} className="text-xs font-mono text-text-secondary">
+                {m}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
   );
+}
+
+/* ─── File-level body ─── */
+
+function FileBody({
+  module: mod,
+  file,
+  sourceSnippets,
+}: {
+  module: ArchModule;
+  file: string;
+  sourceSnippets?: Record<string, string>;
+}) {
   const [highlightedHtml, setHighlightedHtml] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const sourceCode = sourceSnippets?.[file];
 
   useEffect(() => {
-    setActiveFile(mod.files.length > 0 ? mod.files[0] : null);
     setHighlightedHtml(null);
-  }, [mod.id]);
-
-  useEffect(() => {
-    if (!activeFile || !sourceSnippets?.[activeFile]) {
-      setHighlightedHtml(null);
-      return;
-    }
+    if (!sourceCode) return;
 
     let cancelled = false;
     (async () => {
       try {
         const { codeToHtml } = await import("shiki");
-        const lang = inferShikiLang(activeFile);
-        const html = await codeToHtml(sourceSnippets[activeFile], {
-          lang,
-          theme: "vitesse-dark",
-        });
+        const lang = inferShikiLang(file);
+        const html = await codeToHtml(sourceCode, { lang, theme: "vitesse-dark" });
         if (!cancelled) setHighlightedHtml(html);
       } catch {
         if (!cancelled) setHighlightedHtml(null);
       }
     })();
     return () => { cancelled = true; };
-  }, [activeFile, sourceSnippets]);
-
-  const sourceCode = activeFile ? sourceSnippets?.[activeFile] : null;
+  }, [file, sourceCode]);
 
   return (
-    <>
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border shrink-0">
-        <div className="flex items-center gap-2 min-w-0">
-          <h2 className="text-sm font-semibold text-foreground truncate">
-            {mod.name}
-          </h2>
-          <span
-            className="text-[10px] px-1.5 py-0.5 rounded font-medium shrink-0"
-            style={{
-              background: colors.border + "22",
-              color: colors.border,
-              border: `1px solid ${colors.border}44`,
-            }}
-          >
-            {CATEGORY_LABELS[mod.category]}
-          </span>
-        </div>
+    <div className="flex-1 flex flex-col overflow-hidden">
+      {/* File path bar */}
+      <div className="bg-surface-2 px-3 py-1.5 text-[10px] font-mono text-text-tertiary border-b border-border shrink-0 flex items-center gap-1.5">
+        <span className="truncate">{file}</span>
         <button
-          onClick={onClose}
-          className="text-text-secondary hover:text-foreground text-lg px-1 cursor-pointer"
+          onClick={() => {
+            navigator.clipboard.writeText(file);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1500);
+          }}
+          title="Copy file path"
+          className="shrink-0 cursor-pointer text-text-tertiary hover:text-text-secondary"
         >
-          &times;
+          {copied ? <Check size={12} /> : <Copy size={12} />}
         </button>
       </div>
 
-      {/* Body */}
-      <div className="flex-1 flex flex-col overflow-hidden px-4 py-3 text-[13px] leading-relaxed">
-        <p className="text-text-secondary mb-3 shrink-0">{mod.responsibility}</p>
-
-        <SectionTitle>Files</SectionTitle>
-        <div className="space-y-0.5 mb-1 shrink-0">
-          {mod.files.map((f) => (
-            <button
-              key={f}
-              onClick={() => setActiveFile(f)}
-              className={`block text-left text-[11px] font-mono w-full px-1.5 py-0.5 rounded transition-colors cursor-pointer ${
-                activeFile === f
-                  ? "bg-accent/15 text-accent"
-                  : "text-text-tertiary hover:text-text-secondary hover:bg-surface-2"
-              }`}
-            >
-              {f}
-            </button>
-          ))}
+      {/* Code */}
+      {sourceCode ? (
+        <div className="flex-1 overflow-auto hide-scrollbar text-[11px] leading-relaxed">
+          {highlightedHtml ? (
+            <div
+              className="shiki-container"
+              dangerouslySetInnerHTML={{ __html: highlightedHtml }}
+            />
+          ) : (
+            <pre className="p-3 text-text-secondary font-mono whitespace-pre">
+              {sourceCode}
+            </pre>
+          )}
         </div>
-        {mod.lineCount && (
-          <p className="text-[11px] text-text-tertiary shrink-0">
-            {mod.lineCount.toLocaleString()} lines total
-          </p>
-        )}
-
-        {mod.keyTypes.length > 0 && (
-          <div className="shrink-0">
-            <SectionTitle>Key Types</SectionTitle>
-            <div className="flex flex-wrap gap-1.5">
-              {mod.keyTypes.map((t) => (
-                <span
-                  key={t}
-                  className="text-xs font-mono px-2 py-0.5 rounded bg-surface-2 text-accent"
-                >
-                  {t}
-                </span>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {mod.keyMethods.length > 0 && (
-          <div className="shrink-0">
-            <SectionTitle>Key Methods</SectionTitle>
-            <ul className="space-y-0.5">
-              {mod.keyMethods.map((m) => (
-                <li key={m} className="text-xs font-mono text-text-secondary">
-                  {m}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-
-        <SectionTitle>Source Preview</SectionTitle>
-        {sourceCode ? (
-          <div className="rounded-lg overflow-hidden border border-border flex flex-col flex-1 min-h-0">
-            <div className="bg-surface-2 px-3 py-1.5 text-[10px] font-mono text-text-tertiary border-b border-border shrink-0 flex items-center gap-1.5">
-              <span className="truncate">{activeFile}</span>
-              <button
-                onClick={() => {
-                  if (activeFile) {
-                    navigator.clipboard.writeText(activeFile);
-                    setCopied(true);
-                    setTimeout(() => setCopied(false), 1500);
-                  }
-                }}
-                title="Copy file path"
-                className="shrink-0 cursor-pointer text-text-tertiary hover:text-text-secondary"
-              >
-                {copied ? <Check size={12} /> : <Copy size={12} />}
-              </button>
-            </div>
-            <div className="flex-1 overflow-auto hide-scrollbar text-[11px] leading-relaxed">
-              {highlightedHtml ? (
-                <div
-                  className="shiki-container"
-                  dangerouslySetInnerHTML={{ __html: highlightedHtml }}
-                />
-              ) : (
-                <pre className="p-3 text-text-secondary font-mono whitespace-pre">
-                  {sourceCode}
-                </pre>
-              )}
-            </div>
-          </div>
-        ) : (
+      ) : (
+        <div className="flex-1 flex items-center justify-center">
           <p className="text-[11px] text-text-tertiary italic">
-            {mod.files.length === 0
-              ? "No files associated with this module"
-              : "Source preview not available"}
+            Source not available
           </p>
-        )}
-      </div>
-    </>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -340,7 +406,7 @@ function ModuleView({
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
-    <h3 className="text-[11px] font-semibold uppercase tracking-wider text-accent mt-4 mb-1.5 first:mt-0 shrink-0">
+    <h3 className="text-[11px] font-semibold uppercase tracking-wider text-accent mb-1.5 shrink-0">
       {children}
     </h3>
   );
@@ -349,23 +415,10 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 function inferShikiLang(filePath: string): string {
   const ext = filePath.split(".").pop()?.toLowerCase() ?? "";
   const map: Record<string, string> = {
-    ts: "typescript",
-    tsx: "tsx",
-    js: "javascript",
-    jsx: "jsx",
-    py: "python",
-    go: "go",
-    rs: "rust",
-    swift: "swift",
-    java: "java",
-    kt: "kotlin",
-    rb: "ruby",
-    php: "php",
-    cs: "csharp",
-    cpp: "cpp",
-    c: "c",
-    h: "c",
-    hpp: "cpp",
+    ts: "typescript", tsx: "tsx", js: "javascript", jsx: "jsx",
+    py: "python", go: "go", rs: "rust", swift: "swift",
+    java: "java", kt: "kotlin", rb: "ruby", php: "php",
+    cs: "csharp", cpp: "cpp", c: "c", h: "c", hpp: "cpp",
   };
   return map[ext] ?? "text";
 }
