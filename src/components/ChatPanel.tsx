@@ -8,6 +8,13 @@ import { buildFileIndex } from "@/lib/chat-references";
 import type { ArchModule, NodeCategory } from "@/types/graph";
 import type { ChatMessage, FileReference } from "@/types/chat";
 
+const STARTER_QUESTIONS = [
+  "What does this codebase do?",
+  "Walk me through the main data flow",
+  "What are the key entry points?",
+  "How are the modules connected?",
+];
+
 interface ChatPanelProps {
   modules: ArchModule[];
   onFileClick: (filePath: string, moduleId: string, category: NodeCategory) => void;
@@ -212,11 +219,24 @@ export function ChatPanel({ modules, onFileClick }: ChatPanelProps) {
           {/* Messages */}
           <div className="flex-1 overflow-y-auto subtle-scrollbar px-4 py-3">
             {messages.length === 0 && (
-              <div className="h-full flex items-center justify-center">
+              <div className="h-full flex flex-col items-center justify-center gap-5">
                 <p className="text-text-tertiary text-xs text-center leading-relaxed">
                   Ask questions about the codebase.<br />
                   Select a module on the canvas for context.
                 </p>
+                <div className="flex flex-col gap-1.5 w-full max-w-[300px]">
+                  {STARTER_QUESTIONS.map((q) => (
+                    <button
+                      key={q}
+                      onClick={() => sendMessage(q)}
+                      onMouseEnter={() => setInput(q)}
+                      onMouseLeave={() => setInput("")}
+                      className="text-left text-xs text-text-secondary hover:text-foreground px-3 py-2 rounded-full border border-border hover:border-accent/30 hover:bg-surface-2/80 transition-colors cursor-pointer"
+                    >
+                      {q}
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
             {messages.map((msg) => (
