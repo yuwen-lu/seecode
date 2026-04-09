@@ -432,7 +432,12 @@ function GraphCanvasInner({
           return {
             ...n,
             selected: isSelected,
-            data: { ...n.data, dimmed: dimmedBySelection || dimmedByTrace, zoomLevel },
+            data: {
+              ...n.data,
+              dimmed: dimmedBySelection || dimmedByTrace,
+              // Individual nodes always show at least compact; group nodes stay collapsed
+              zoomLevel: n.type === "groupNode" ? zoomLevel : (zoomLevel === "collapsed" ? "compact" : zoomLevel),
+            },
           };
         })}
         edges={edges.map((e) => {
