@@ -32,9 +32,7 @@ export const GroupNode = memo(function GroupNode({
         className="rounded-xl px-4 py-3 min-w-[200px] max-w-[300px]"
         style={{
           background: colors.bg,
-          boxShadow: selected
-            ? `0 0 0 1.5px ${colors.border}`
-            : `0 1px 4px rgba(0,0,0,0.35), inset 0 1px 0 ${colors.border}44`,
+          boxShadow: `0 1px 4px rgba(0,0,0,0.35), inset 0 1px 0 ${colors.border}44`,
           opacity: data.dimmed ? 0.25 : 1,
         }}
       >

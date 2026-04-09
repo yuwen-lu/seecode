@@ -14,7 +14,6 @@ interface ArchNodeData {
 
 export const ArchNode = memo(function ArchNode({
   data,
-  selected,
 }: {
   data: ArchNodeData;
   selected?: boolean;
@@ -33,9 +32,7 @@ export const ArchNode = memo(function ArchNode({
         className="rounded-lg px-3 py-2 min-w-[180px] max-w-[260px]"
         style={{
           background: colors.bg,
-          boxShadow: selected
-            ? `0 0 0 1.5px ${colors.border}`
-            : `0 1px 3px rgba(0,0,0,0.3), inset 0 1px 0 ${colors.border}44`,
+          boxShadow: `0 1px 3px rgba(0,0,0,0.3), inset 0 1px 0 ${colors.border}44`,
           opacity: dimmed ? 0.25 : 1,
         }}
       >
@@ -69,6 +66,50 @@ export const ArchNode = memo(function ArchNode({
                 {t}
               </span>
             ))}
+          </div>
+        )}
+
+        {/* Key methods */}
+        {showDetail && mod.keyMethods.length > 0 && (
+          <div
+            className="mt-1.5 pt-1.5 space-y-0.5"
+            style={{ borderTop: `1px solid ${colors.border}18` }}
+          >
+            {mod.keyMethods.slice(0, 3).map((m) => (
+              <div
+                key={m}
+                className="text-[9px] font-mono truncate"
+                style={{ color: `${colors.text}77` }}
+              >
+                {m}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Files */}
+        {showDetail && mod.files.length > 0 && (
+          <div
+            className="mt-1.5 pt-1 space-y-0.5"
+            style={{ borderTop: `1px solid ${colors.border}18` }}
+          >
+            {mod.files.slice(0, 3).map((f) => (
+              <div
+                key={f}
+                className="text-[8px] font-mono truncate"
+                style={{ color: `${colors.text}55` }}
+              >
+                {f}
+              </div>
+            ))}
+            {mod.files.length > 3 && (
+              <div
+                className="text-[8px]"
+                style={{ color: `${colors.text}44` }}
+              >
+                +{mod.files.length - 3} more
+              </div>
+            )}
           </div>
         )}
 
