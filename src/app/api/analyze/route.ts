@@ -1,5 +1,4 @@
 import { NextRequest } from "next/server";
-import fs from "fs";
 import { parseGitHubUrl, cloneRepo, discoverFiles, detectPrimaryLanguage, cleanupRepo } from "@/lib/repo";
 import { extractAll } from "@/lib/extractors";
 import { analyzeWithLLMStreaming } from "@/lib/llm-analyzer";
@@ -80,25 +79,7 @@ export async function POST(request: NextRequest) {
           },
         );
 
-        // Step 5: Capture source snippets before cleanup
-        const sourceSnippets: Record<string, string> = {};
-        for (const mod of llmResult.modules) {
-          for (const filePath of mod.files) {
-            if (sourceSnippets[filePath]) continue;
-            const sf = files.find(
-              (f) => f.relativePath === filePath || f.relativePath.endsWith(filePath)
-            );
-            if (sf) {
-              try {
-                const content = fs.readFileSync(sf.absolutePath, "utf-8");
-                const lines = content.split("\n");
-                sourceSnippets[filePath] = lines.slice(0, 200).join("\n");
-              } catch { /* skip unreadable */ }
-            }
-          }
-        }
-
-        // Step 6: Build and cache the graph
+        // Step 5: Build and cache the graph
         const graph: ArchGraph = {
           repoUrl: url,
           repoName,
@@ -108,7 +89,6 @@ export async function POST(request: NextRequest) {
           edges: llmResult.edges,
           traces: llmResult.traces,
           mermaid: llmResult.mermaid,
-          sourceSnippets,
         };
 
         cacheGraph(graph);

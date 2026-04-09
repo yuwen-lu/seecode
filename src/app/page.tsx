@@ -220,7 +220,8 @@ export default function Home() {
         {selection && (
           <DetailPanel
             selection={selection}
-            sourceSnippets={graph?.sourceSnippets}
+            repoUrl={graph?.repoUrl ?? ""}
+            commitSha={graph?.commitSha ?? ""}
             onClose={() => handleSelect(null)}
             onViewChange={onPanelViewChange}
           />

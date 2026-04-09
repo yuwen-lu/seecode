@@ -1,10 +1,9 @@
 import type { ArchGraph } from "@/types/graph";
-import { MOCK_SNIPPETS } from "./mock-snippets";
 
 export const MOCK_CLICKY: ArchGraph = {
   repoUrl: "https://github.com/farzaa/clicky",
   repoName: "farzaa/clicky",
-  commitSha: "mock",
+  commitSha: "main",
   analyzedAt: new Date().toISOString(),
   modules: [
     {
@@ -338,5 +337,4 @@ export const MOCK_CLICKY: ArchGraph = {
       ],
     },
   ],
-  sourceSnippets: MOCK_SNIPPETS,
 };

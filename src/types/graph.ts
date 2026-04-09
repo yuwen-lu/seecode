@@ -44,7 +44,6 @@ export interface ArchGraph {
   edges: ArchEdge[];
   traces: DataTrace[];
   mermaid?: string; // Raw Mermaid source for debug view
-  sourceSnippets?: Record<string, string>; // file path → source content (first 200 lines)
 }
 
 /** Panel selection — either a component (group) or a specific module */
@@ -64,6 +63,13 @@ export const CATEGORY_COLORS: Record<NodeCategory, { bg: string; border: string;
   data:       { bg: '#33142a', border: '#ec4899', text: '#fce7f3' },
   config:     { bg: '#231a3f', border: '#8b5cf6', text: '#ddd6fe' },
 };
+
+/** Build a raw GitHub URL for fetching file contents */
+export function githubRawUrl(repoUrl: string, commitSha: string, filePath: string): string {
+  const match = repoUrl.match(/github\.com\/([^/]+)\/([^/.]+)/);
+  if (!match) return "";
+  return `https://raw.githubusercontent.com/${match[1]}/${match[2]}/${commitSha}/${filePath}`;
+}
 
 export const CATEGORY_LABELS: Record<NodeCategory, string> = {
   core: 'Core',
