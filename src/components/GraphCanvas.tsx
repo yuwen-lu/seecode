@@ -16,7 +16,6 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import type { ArchGraph, ArchModule, NodeCategory, PanelSelection } from "@/types/graph";
-import type { PanelDepth } from "./DetailPanel";
 import { ArchNode } from "./ArchNode";
 import { GroupNode, type GroupNodeData } from "./GroupNode";
 import { DetailSlider } from "./DetailSlider";
@@ -31,7 +30,6 @@ interface GraphCanvasProps {
   activeTrace: string | null;
   onSelect: (selection: PanelSelection | null) => void;
   selectedNodeId: string | null;
-  panelDepth?: PanelDepth | null;
 }
 
 const nodeTypes = {
@@ -44,7 +42,6 @@ function GraphCanvasInner({
   activeTrace,
   onSelect,
   selectedNodeId,
-  panelDepth,
 }: GraphCanvasProps) {
   const { fitView } = useReactFlow();
   const [zoomLevel, setZoomLevel] = useState<ZoomLevel>("collapsed");
@@ -68,7 +65,7 @@ function GraphCanvasInner({
   }, []);
 
   const clickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [animating, setAnimating] = useState(false);
+  const [animClass, setAnimClass] = useState<"" | "react-flow--seeding" | "react-flow--morphing" | "react-flow--animating">("");
   const animTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fitViewTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -82,15 +79,22 @@ function GraphCanvasInner({
   }, []);
 
   const triggerAnimation = useCallback(() => {
-    setAnimating(true);
+    setAnimClass("react-flow--animating");
     if (animTimer.current) clearTimeout(animTimer.current);
-    animTimer.current = setTimeout(() => setAnimating(false), 500);
+    animTimer.current = setTimeout(() => setAnimClass(""), 600);
   }, []);
 
-  // Debounced fitView — cancels any pending call so rapid actions don't stack up
-  const scheduleFitView = useCallback(() => {
+  // Debounced fitView — delayed so morph animation plays first
+  // Pass nodeIds to scope the fit to specific nodes, or omit to fit all
+  const scheduleFitView = useCallback((nodeIds?: string[]) => {
     if (fitViewTimer.current) clearTimeout(fitViewTimer.current);
-    fitViewTimer.current = setTimeout(() => fitView({ padding: 0.12, duration: 400 }), 50);
+    fitViewTimer.current = setTimeout(() => {
+      if (nodeIds && nodeIds.length > 0) {
+        fitView({ padding: 0.15, duration: 350, nodes: nodeIds.map((id) => ({ id })) });
+      } else {
+        fitView({ padding: 0.12, duration: 350 });
+      }
+    }, 300);
   }, [fitView]);
 
   // All unique categories in the graph
@@ -150,52 +154,97 @@ function GraphCanvasInner({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [triggerAnimation, scheduleFitView, locked]);
 
-  // Sync canvas zoom level with the panel's current depth
-  useEffect(() => {
-    if (!panelDepth) return; // no panel open — leave canvas as-is
-
-    if (panelDepth === "component") {
-      // Component level → collapse all
-      if (effectiveExpanded.size > 0) {
-        triggerAnimation();
-        pushExpansion(new Set());
-        prevZoomLevel.current = "collapsed";
-        setZoomLevel("collapsed");
-        scheduleFitView();
-      }
-    } else {
-      // Module or file level → expand all
-      if (effectiveExpanded.size < allCategories.size) {
-        triggerAnimation();
-        pushExpansion(new Set(allCategories));
-        if (zoomLevel === "collapsed") {
-          prevZoomLevel.current = panelDepth === "file" ? "detailed" : "compact";
-          setZoomLevel(panelDepth === "file" ? "detailed" : "compact");
-        }
-        scheduleFitView();
-      } else if (panelDepth === "file" && zoomLevel !== "detailed") {
-        prevZoomLevel.current = "detailed";
-        setZoomLevel("detailed");
-      } else if (panelDepth === "module" && zoomLevel === "detailed") {
-        prevZoomLevel.current = "compact";
-        setZoomLevel("compact");
-      }
-    }
-  }, [panelDepth]); // eslint-disable-line react-hooks/exhaustive-deps
-
   // Track whether this is the first render (skip animation on mount)
   const isInitialRender = useRef(true);
+  // Remember previous node positions for morph animation
+  const prevNodePositions = useRef<Map<string, { x: number; y: number }>>(new Map());
+  // Remember which modules belonged to which group (for expand/collapse morphs)
+  const prevGroupMembership = useRef<Map<string, string>>(new Map());
 
-  // Update nodes/edges when layout changes
+  // Update nodes/edges when layout changes — with morph animation
   useEffect(() => {
-    setNodes(layout.nodes);
+    if (isInitialRender.current) {
+      isInitialRender.current = false;
+      setNodes(layout.nodes);
+      setEdges(layout.edges);
+      setTimeout(() => fitView({ padding: 0.12, duration: 300 }), 100);
+      // Store initial positions
+      for (const n of layout.nodes) {
+        prevNodePositions.current.set(n.id, { ...n.position });
+      }
+      // Store group membership from nodeIdMap
+      for (const [modId, nodeId] of layout.nodeIdMap) {
+        if (nodeId !== modId) prevGroupMembership.current.set(modId, nodeId);
+      }
+      return;
+    }
+
+    const oldPositions = prevNodePositions.current;
+    const oldGroupMembership = prevGroupMembership.current;
+    const newNodeIds = new Set(layout.nodes.map((n) => n.id));
+
+    // Phase 1: Seed new nodes at their origin position (where they're "coming from")
+    const seededNodes = layout.nodes.map((n) => {
+      const oldPos = oldPositions.get(n.id);
+      if (oldPos) {
+        // Node existed before — start at its old position, will animate to new
+        return { ...n, position: { ...oldPos } };
+      }
+
+      // New node — find where it should emerge from
+      if (n.type === "groupNode") {
+        // Group node appearing (collapse): start at centroid of its members' old positions
+        const members = (n.data as GroupNodeData).members as ArchModule[];
+        let cx = 0, cy = 0, count = 0;
+        for (const m of members) {
+          const mPos = oldPositions.get(m.id);
+          if (mPos) { cx += mPos.x; cy += mPos.y; count++; }
+        }
+        if (count > 0) {
+          return { ...n, position: { x: cx / count, y: cy / count } };
+        }
+      } else {
+        // Individual node appearing (expand): start at its old group node's position
+        const groupId = oldGroupMembership.get(n.id);
+        if (groupId) {
+          const groupPos = oldPositions.get(groupId);
+          if (groupPos) {
+            return { ...n, position: { ...groupPos } };
+          }
+        }
+      }
+
+      return n;
+    });
+
+    // Phase 1: Apply seeded positions instantly (no transition)
+    setAnimClass("react-flow--seeding");
+    setNodes(seededNodes);
     setEdges(layout.edges);
 
-    if (isInitialRender.current) {
-      // First render: quick fit, no node animation
-      isInitialRender.current = false;
-      setTimeout(() => fitView({ padding: 0.12, duration: 300 }), 100);
+    // Phase 2: After browser paints seeded positions, enable transitions and apply final positions
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        setAnimClass("react-flow--morphing");
+        setNodes(layout.nodes);
+        // Clear morphing class after transition completes
+        if (animTimer.current) clearTimeout(animTimer.current);
+        animTimer.current = setTimeout(() => setAnimClass(""), 600);
+      });
+    });
+
+    // Store new positions and membership for next transition
+    const nextPositions = new Map<string, { x: number; y: number }>();
+    for (const n of layout.nodes) {
+      nextPositions.set(n.id, { ...n.position });
     }
+    prevNodePositions.current = nextPositions;
+
+    const nextMembership = new Map<string, string>();
+    for (const [modId, nodeId] of layout.nodeIdMap) {
+      if (nodeId !== modId) nextMembership.set(modId, nodeId);
+    }
+    prevGroupMembership.current = nextMembership;
   }, [layout, setNodes, setEdges, fitView]);
 
   // Trace highlighting
@@ -332,7 +381,7 @@ function GraphCanvasInner({
   return (
     <>
       <ReactFlow
-        className={animating ? "react-flow--animating" : undefined}
+        className={animClass || undefined}
         nodes={nodes.map((n) => {
           const isSelected = n.id === selectedNodeId ||
             (n.type === "groupNode" && selectedNodeId
@@ -364,14 +413,12 @@ function GraphCanvasInner({
         <Controls position="bottom-left" showInteractive={false} />
       </ReactFlow>
 
-      {!panelDepth && (
-        <DetailSlider
-          level={displayLevel}
-          locked={locked}
-          onLevelChange={handleLevelChange}
-          onLockedChange={setLocked}
-        />
-      )}
+      <DetailSlider
+        level={displayLevel}
+        locked={locked}
+        onLevelChange={handleLevelChange}
+        onLockedChange={setLocked}
+      />
     </>
   );
 }
