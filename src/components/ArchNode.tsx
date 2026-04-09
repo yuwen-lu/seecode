@@ -1,13 +1,15 @@
 "use client";
 
 import { memo } from "react";
-import { Handle, Position, useViewport } from "@xyflow/react";
+import { Handle, Position } from "@xyflow/react";
 import type { ArchModule } from "@/types/graph";
 import { CATEGORY_COLORS, CATEGORY_LABELS } from "@/types/graph";
+import type { ZoomLevel } from "@/lib/semantic-zoom";
 
 interface ArchNodeData {
   module: ArchModule;
   dimmed?: boolean;
+  zoomLevel?: ZoomLevel;
 }
 
 export const ArchNode = memo(function ArchNode({
@@ -17,13 +19,12 @@ export const ArchNode = memo(function ArchNode({
   data: ArchNodeData;
   selected?: boolean;
 }) {
-  const { zoom } = useViewport();
-  const { module: mod, dimmed } = data;
+  const { module: mod, dimmed, zoomLevel } = data;
   const colors = CATEGORY_COLORS[mod.category];
 
-  // Semantic zoom levels
-  const showDetail = zoom > 0.7;
-  const showClasses = zoom > 0.4;
+  // Use zoomLevel from slider when available (locked mode)
+  const showDetail = zoomLevel === "detailed";
+  const showCompact = zoomLevel === "detailed" || zoomLevel === "compact";
 
   return (
     <>
@@ -32,65 +33,60 @@ export const ArchNode = memo(function ArchNode({
         className="rounded-lg px-3 py-2 min-w-[180px] max-w-[260px]"
         style={{
           background: colors.bg,
-          border: `2px solid ${selected ? colors.border : colors.border + "88"}`,
+          boxShadow: selected
+            ? `0 0 0 1.5px ${colors.border}`
+            : `0 1px 3px rgba(0,0,0,0.3), inset 0 1px 0 ${colors.border}44`,
           opacity: dimmed ? 0.25 : 1,
         }}
       >
-        {/* Header: name + category badge */}
-        <div className="flex items-start justify-between gap-2 mb-1">
-          <span
-            className="text-sm font-semibold leading-tight"
-            style={{ color: colors.text }}
-          >
-            {mod.name}
-          </span>
-          <span
-            className="text-[9px] px-1.5 py-0.5 rounded shrink-0 font-medium"
-            style={{
-              background: colors.border + "22",
-              color: colors.border,
-              border: `1px solid ${colors.border}44`,
-            }}
-          >
-            {CATEGORY_LABELS[mod.category]}
-          </span>
-        </div>
+        {/* Name */}
+        <span
+          className="text-[13px] font-semibold leading-tight block"
+          style={{ color: colors.text }}
+        >
+          {mod.name}
+        </span>
 
-        {/* Responsibility (compact view) */}
-        {showClasses && (
+        {/* Responsibility */}
+        {showCompact && (
           <p
-            className="text-[10px] leading-tight mb-1"
-            style={{ color: colors.text + "99" }}
+            className="text-[10px] leading-snug mt-1"
+            style={{ color: `${colors.text}99` }}
           >
             {mod.responsibility}
           </p>
         )}
 
-        {/* Detail view: key types and methods */}
+        {/* Key types */}
         {showDetail && mod.keyTypes.length > 0 && (
-          <div className="mt-1.5 pt-1.5" style={{ borderTop: `1px solid ${colors.border}33` }}>
-            <div className="flex flex-wrap gap-1">
-              {mod.keyTypes.slice(0, 4).map((t) => (
-                <span
-                  key={t}
-                  className="text-[9px] px-1 py-0.5 rounded font-mono"
-                  style={{ background: colors.border + "15", color: colors.text + "cc" }}
-                >
-                  {t}
-                </span>
-              ))}
-            </div>
+          <div className="flex flex-wrap gap-1 mt-1.5">
+            {mod.keyTypes.slice(0, 4).map((t) => (
+              <span
+                key={t}
+                className="text-[9px] px-1 py-0.5 rounded font-mono"
+                style={{ background: `${colors.border}15`, color: `${colors.text}cc` }}
+              >
+                {t}
+              </span>
+            ))}
           </div>
         )}
 
-        {/* File count / line count */}
-        {showClasses && (
+        {/* Stats line */}
+        {showCompact && (
           <div
-            className="text-[9px] mt-1"
-            style={{ color: colors.text + "55" }}
+            className="text-[9px] mt-1.5 flex items-center gap-1.5"
+            style={{ color: `${colors.text}55` }}
           >
+            <span
+              className="text-[8px] font-medium uppercase tracking-wide"
+              style={{ color: `${colors.border}cc` }}
+            >
+              {CATEGORY_LABELS[mod.category]}
+            </span>
+            <span>·</span>
             {mod.files.length} file{mod.files.length !== 1 ? "s" : ""}
-            {mod.lineCount ? ` \u00b7 ${mod.lineCount} lines` : ""}
+            {mod.lineCount ? ` · ${mod.lineCount} lines` : ""}
           </div>
         )}
       </div>

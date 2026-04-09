@@ -32,25 +32,19 @@ export const GroupNode = memo(function GroupNode({
         className="rounded-xl px-4 py-3 min-w-[200px] max-w-[300px]"
         style={{
           background: colors.bg,
-          border: `2.5px solid ${selected ? colors.border : colors.border + "99"}`,
+          boxShadow: selected
+            ? `0 0 0 1.5px ${colors.border}`
+            : `0 1px 4px rgba(0,0,0,0.35), inset 0 1px 0 ${colors.border}44`,
           opacity: data.dimmed ? 0.25 : 1,
         }}
       >
-        {/* Category badge */}
-        <div className="flex items-center gap-2 mb-1.5">
-          <div
-            className="w-2.5 h-2.5 rounded-sm"
-            style={{ background: colors.border }}
-          />
-          <span
-            className="text-[10px] font-semibold uppercase tracking-wider"
-            style={{ color: colors.border }}
-          >
-            {CATEGORY_LABELS[data.category]}
-          </span>
-        </div>
-
-        {/* Group name */}
+        {/* Category + group name */}
+        <span
+          className="text-[10px] font-medium uppercase tracking-wide block mb-0.5"
+          style={{ color: `${colors.border}cc` }}
+        >
+          {CATEGORY_LABELS[data.category]}
+        </span>
         <div
           className="text-sm font-bold leading-snug mb-1"
           style={{ color: colors.text }}
@@ -61,15 +55,15 @@ export const GroupNode = memo(function GroupNode({
         {/* Description */}
         <p
           className="text-[10px] leading-snug mb-2"
-          style={{ color: colors.text + "88" }}
+          style={{ color: `${colors.text}88` }}
         >
           {data.description}
         </p>
 
-        {/* Member list */}
+        {/* Member names */}
         <div
           className="text-[9px] flex flex-wrap gap-x-2 gap-y-0.5"
-          style={{ color: colors.text + "66" }}
+          style={{ color: `${colors.text}66` }}
         >
           {data.members.slice(0, 5).map((m) => (
             <span key={m.id}>{m.name}</span>
@@ -81,10 +75,10 @@ export const GroupNode = memo(function GroupNode({
 
         {/* Stats */}
         <div
-          className="text-[9px] mt-1.5 pt-1.5"
-          style={{ color: colors.text + "44", borderTop: `1px solid ${colors.border}22` }}
+          className="text-[9px] mt-2 pt-1.5"
+          style={{ color: `${colors.text}44`, borderTop: `1px solid ${colors.border}22` }}
         >
-          {data.memberCount} component{data.memberCount !== 1 ? "s" : ""}
+          {data.memberCount} module{data.memberCount !== 1 ? "s" : ""}
           {data.totalLines > 0 ? ` · ${data.totalLines.toLocaleString()} lines` : ""}
         </div>
       </div>
