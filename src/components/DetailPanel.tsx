@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Copy, Check, ChevronRight, ChevronLeft } from "lucide-react";
+import { Copy, Check, ChevronRight, ChevronLeft, Maximize2, X } from "lucide-react";
 import type { ArchModule, PanelSelection, NodeCategory } from "@/types/graph";
-import { CATEGORY_COLORS, CATEGORY_LABELS } from "@/types/graph";
+import { CATEGORY_COLORS, CATEGORY_LABELS, githubRawUrl } from "@/types/graph";
 
 type PanelView =
   | { level: "component"; category: NodeCategory; label: string; members: ArchModule[] }
@@ -14,12 +14,13 @@ export type PanelDepth = "component" | "module" | "file";
 
 interface DetailPanelProps {
   selection: PanelSelection;
-  sourceSnippets?: Record<string, string>;
+  repoUrl: string;
+  commitSha: string;
   onClose: () => void;
   onViewChange: (depth: PanelDepth, moduleId: string | null) => void;
 }
 
-export function DetailPanel({ selection, sourceSnippets, onClose, onViewChange }: DetailPanelProps) {
+export function DetailPanel({ selection, repoUrl, commitSha, onClose, onViewChange }: DetailPanelProps) {
   const [width, setWidth] = useState(400);
   const isResizing = useRef(false);
 
@@ -36,7 +37,6 @@ export function DetailPanel({ selection, sourceSnippets, onClose, onViewChange }
   // Notify parent whenever the current view changes
   useEffect(() => {
     const moduleId = currentView.level === "component" ? null
-      : currentView.level === "module" ? currentView.module.id
       : currentView.module.id;
     onViewChange(currentView.level, moduleId);
   }, [currentView]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -100,15 +100,16 @@ export function DetailPanel({ selection, sourceSnippets, onClose, onViewChange }
       {currentView.level === "module" && (
         <ModuleBody
           module={currentView.module}
-          sourceSnippets={sourceSnippets}
+          repoUrl={repoUrl}
+          commitSha={commitSha}
           onSelectFile={(file) => pushView({ level: "file", module: currentView.module, file })}
         />
       )}
       {currentView.level === "file" && (
         <FileBody
-          module={currentView.module}
           file={currentView.file}
-          sourceSnippets={sourceSnippets}
+          repoUrl={repoUrl}
+          commitSha={commitSha}
         />
       )}
     </div>
@@ -247,42 +248,109 @@ function ComponentBody({
 
 function ModuleBody({
   module: mod,
-  sourceSnippets,
+  repoUrl,
+  commitSha,
   onSelectFile,
 }: {
   module: ArchModule;
-  sourceSnippets?: Record<string, string>;
+  repoUrl: string;
+  commitSha: string;
   onSelectFile: (file: string) => void;
 }) {
+  const [activeFile, setActiveFile] = useState<string | null>(
+    mod.files.length > 0 ? mod.files[0] : null
+  );
+  const [sourceCode, setSourceCode] = useState<string | null>(null);
+  const [loadingSource, setLoadingSource] = useState(false);
+  const [sourceError, setSourceError] = useState<string | null>(null);
+  const [highlightedHtml, setHighlightedHtml] = useState<string | null>(null);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+
+  // Reset active file when module changes
+  useEffect(() => {
+    setActiveFile(mod.files.length > 0 ? mod.files[0] : null);
+  }, [mod.id]);
+
+  // Fetch source for active file
+  useEffect(() => {
+    setSourceCode(null);
+    setHighlightedHtml(null);
+    setSourceError(null);
+
+    if (!activeFile) return;
+
+    const rawUrl = githubRawUrl(repoUrl, commitSha, activeFile);
+    if (!rawUrl) {
+      setSourceError("Cannot resolve file URL");
+      return;
+    }
+
+    setLoadingSource(true);
+    let cancelled = false;
+
+    fetch(rawUrl)
+      .then((res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.text();
+      })
+      .then((text) => {
+        if (!cancelled) {
+          setSourceCode(text);
+          setLoadingSource(false);
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setSourceError(`Failed to load: ${err.message}`);
+          setLoadingSource(false);
+        }
+      });
+
+    return () => { cancelled = true; };
+  }, [activeFile, repoUrl, commitSha]);
+
+  // Highlight after fetch
+  useEffect(() => {
+    if (!sourceCode || !activeFile) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { codeToHtml } = await import("shiki");
+        const lang = inferShikiLang(activeFile);
+        const html = await codeToHtml(sourceCode, { lang, theme: "vitesse-dark" });
+        if (!cancelled) setHighlightedHtml(html);
+      } catch {
+        if (!cancelled) setHighlightedHtml(null);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [sourceCode, activeFile]);
+
   return (
-    <div className="flex-1 overflow-y-auto px-4 py-3 text-[13px] leading-relaxed space-y-4">
+    <div className="flex-1 flex flex-col overflow-hidden px-4 py-3 text-[13px] leading-relaxed">
       {/* Responsibility */}
-      <p className="text-text-secondary">{mod.responsibility}</p>
+      <p className="text-text-secondary mb-4 shrink-0">{mod.responsibility}</p>
 
       {/* Files */}
       {mod.files.length > 0 && (
-        <div>
+        <div className="shrink-0 mb-4">
           <SectionTitle>Files</SectionTitle>
           <div className="space-y-0.5">
-            {mod.files.map((f) => {
-              const hasSource = !!sourceSnippets?.[f];
-              return (
-                <button
-                  key={f}
-                  onClick={() => hasSource && onSelectFile(f)}
-                  className={`flex items-center justify-between gap-2 text-[11px] font-mono w-full px-1.5 py-1 rounded transition-colors ${
-                    hasSource
-                      ? "text-text-tertiary hover:text-text-secondary hover:bg-surface-2 cursor-pointer group"
-                      : "text-text-tertiary"
-                  }`}
-                >
-                  <span className="truncate">{f}</span>
-                  {hasSource && (
-                    <ChevronRight size={12} className="shrink-0 text-text-tertiary group-hover:text-accent opacity-0 group-hover:opacity-100 transition-opacity" />
-                  )}
-                </button>
-              );
-            })}
+            {mod.files.map((f) => (
+              <button
+                key={f}
+                onClick={() => setActiveFile(f)}
+                onDoubleClick={() => onSelectFile(f)}
+                className={`flex items-center justify-between gap-2 text-[11px] font-mono w-full px-1.5 py-1 rounded transition-colors cursor-pointer group ${
+                  activeFile === f
+                    ? "bg-accent/15 text-accent"
+                    : "text-text-tertiary hover:text-text-secondary hover:bg-surface-2"
+                }`}
+              >
+                <span className="truncate">{f}</span>
+                <ChevronRight size={12} className="shrink-0 text-text-tertiary group-hover:text-accent opacity-0 group-hover:opacity-100 transition-opacity" />
+              </button>
+            ))}
           </div>
           {mod.lineCount != null && mod.lineCount > 0 && (
             <p className="text-[11px] text-text-tertiary mt-1">
@@ -294,7 +362,7 @@ function ModuleBody({
 
       {/* Key Types */}
       {mod.keyTypes.length > 0 && (
-        <div>
+        <div className="shrink-0 mb-4">
           <SectionTitle>Key Types</SectionTitle>
           <div className="flex flex-wrap gap-1.5">
             {mod.keyTypes.map((t) => (
@@ -311,7 +379,7 @@ function ModuleBody({
 
       {/* Key Methods */}
       {mod.keyMethods.length > 0 && (
-        <div>
+        <div className="shrink-0 mb-4">
           <SectionTitle>Key Methods</SectionTitle>
           <ul className="space-y-0.5">
             {mod.keyMethods.map((m) => (
@@ -322,6 +390,55 @@ function ModuleBody({
           </ul>
         </div>
       )}
+
+      {/* Source Preview — grows to fill remaining space */}
+      <SectionTitle>Source Preview</SectionTitle>
+      <div className="rounded-lg overflow-hidden border border-border flex flex-col flex-1 min-h-0">
+        {activeFile && (
+          <div className="bg-surface-2 px-3 py-1.5 text-[10px] font-mono text-text-tertiary border-b border-border shrink-0 flex items-center gap-1.5">
+            <span className="truncate flex-1">{activeFile}</span>
+            {(sourceCode || highlightedHtml) && (
+              <button
+                onClick={() => setLightboxOpen(true)}
+                title="Expand preview"
+                className="shrink-0 cursor-pointer text-text-tertiary hover:text-text-secondary"
+              >
+                <Maximize2 size={12} />
+              </button>
+            )}
+          </div>
+        )}
+        <div className="flex-1 overflow-auto hide-scrollbar text-[11px] leading-relaxed">
+          {loadingSource ? (
+            <div className="p-3 text-text-tertiary text-[11px]">Loading source...</div>
+          ) : sourceError ? (
+            <div className="p-3 text-text-tertiary text-[11px] italic">{sourceError}</div>
+          ) : highlightedHtml ? (
+            <div
+              className="shiki-container"
+              dangerouslySetInnerHTML={{ __html: highlightedHtml }}
+            />
+          ) : sourceCode ? (
+            <pre className="p-3 text-text-secondary font-mono whitespace-pre">
+              {sourceCode}
+            </pre>
+          ) : (
+            <div className="p-3 text-text-tertiary text-[11px] italic">
+              {mod.files.length === 0 ? "No files associated with this module" : "Select a file to preview"}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Lightbox */}
+      {lightboxOpen && activeFile && (
+        <CodeLightbox
+          file={activeFile}
+          sourceCode={sourceCode}
+          highlightedHtml={highlightedHtml}
+          onClose={() => setLightboxOpen(false)}
+        />
+      )}
     </div>
   );
 }
@@ -329,22 +446,59 @@ function ModuleBody({
 /* ─── File-level body ─── */
 
 function FileBody({
-  module: mod,
   file,
-  sourceSnippets,
+  repoUrl,
+  commitSha,
 }: {
-  module: ArchModule;
   file: string;
-  sourceSnippets?: Record<string, string>;
+  repoUrl: string;
+  commitSha: string;
 }) {
+  const [sourceCode, setSourceCode] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [highlightedHtml, setHighlightedHtml] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
-  const sourceCode = sourceSnippets?.[file];
 
+  // Fetch source from GitHub raw
   useEffect(() => {
+    setSourceCode(null);
     setHighlightedHtml(null);
-    if (!sourceCode) return;
+    setLoading(true);
+    setError(null);
 
+    const rawUrl = githubRawUrl(repoUrl, commitSha, file);
+    if (!rawUrl) {
+      setError("Cannot resolve file URL");
+      setLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    fetch(rawUrl)
+      .then((res) => {
+        if (!res.ok) throw new Error(`${res.status}`);
+        return res.text();
+      })
+      .then((text) => {
+        if (!cancelled) {
+          setSourceCode(text);
+          setLoading(false);
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setError(`Failed to fetch: ${err.message}`);
+          setLoading(false);
+        }
+      });
+
+    return () => { cancelled = true; };
+  }, [file, repoUrl, commitSha]);
+
+  // Highlight with shiki after source loads
+  useEffect(() => {
+    if (!sourceCode) return;
     let cancelled = false;
     (async () => {
       try {
@@ -357,7 +511,7 @@ function FileBody({
       }
     })();
     return () => { cancelled = true; };
-  }, [file, sourceCode]);
+  }, [sourceCode, file]);
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
@@ -378,7 +532,15 @@ function FileBody({
       </div>
 
       {/* Code */}
-      {sourceCode ? (
+      {loading ? (
+        <div className="flex-1 flex items-center justify-center">
+          <p className="text-[11px] text-text-tertiary">Loading source...</p>
+        </div>
+      ) : error ? (
+        <div className="flex-1 flex items-center justify-center">
+          <p className="text-[11px] text-text-tertiary italic">{error}</p>
+        </div>
+      ) : sourceCode ? (
         <div className="flex-1 overflow-auto hide-scrollbar text-[11px] leading-relaxed">
           {highlightedHtml ? (
             <div
@@ -391,13 +553,87 @@ function FileBody({
             </pre>
           )}
         </div>
-      ) : (
-        <div className="flex-1 flex items-center justify-center">
-          <p className="text-[11px] text-text-tertiary italic">
-            Source not available
-          </p>
+      ) : null}
+    </div>
+  );
+}
+
+/* ─── Code Lightbox ─── */
+
+function CodeLightbox({
+  file,
+  sourceCode,
+  highlightedHtml,
+  onClose,
+}: {
+  file: string;
+  sourceCode: string | null;
+  highlightedHtml: string | null;
+  onClose: () => void;
+}) {
+  const [copied, setCopied] = useState(false);
+
+  // Close on Escape
+  useEffect(() => {
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [onClose]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      onClick={onClose}
+    >
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-black/70" />
+
+      {/* Modal */}
+      <div
+        className="relative bg-surface-1 border border-border rounded-xl shadow-2xl flex flex-col overflow-hidden"
+        style={{ width: "min(90vw, 900px)", height: "min(85vh, 700px)" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 py-2.5 bg-surface-2 border-b border-border shrink-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-[11px] font-mono text-text-tertiary truncate">{file}</span>
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(file);
+                setCopied(true);
+                setTimeout(() => setCopied(false), 1500);
+              }}
+              title="Copy file path"
+              className="shrink-0 cursor-pointer text-text-tertiary hover:text-text-secondary"
+            >
+              {copied ? <Check size={12} /> : <Copy size={12} />}
+            </button>
+          </div>
+          <button
+            onClick={onClose}
+            className="shrink-0 cursor-pointer text-text-tertiary hover:text-foreground p-1"
+          >
+            <X size={16} />
+          </button>
         </div>
-      )}
+
+        {/* Code */}
+        <div className="flex-1 overflow-auto text-[12px] leading-relaxed">
+          {highlightedHtml ? (
+            <div
+              className="shiki-container"
+              dangerouslySetInnerHTML={{ __html: highlightedHtml }}
+            />
+          ) : sourceCode ? (
+            <pre className="p-4 text-text-secondary font-mono whitespace-pre">
+              {sourceCode}
+            </pre>
+          ) : null}
+        </div>
+      </div>
     </div>
   );
 }
