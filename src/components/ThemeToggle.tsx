@@ -25,7 +25,7 @@ export function ThemeToggle() {
       <div
         className="absolute transition-all duration-300 ease-in-out"
         style={{
-          transform: isDark ? "translateY(0) rotate(0)" : "translateY(-30px) rotate(-90deg)",
+          transform: isDark ? "translateX(0) rotate(0)" : "translateX(-30px) rotate(-90deg)",
           opacity: isDark ? 1 : 0,
         }}
       >
@@ -34,7 +34,7 @@ export function ThemeToggle() {
       <div
         className="absolute transition-all duration-300 ease-in-out"
         style={{
-          transform: isDark ? "translateY(30px) rotate(90deg)" : "translateY(0) rotate(0)",
+          transform: isDark ? "translateX(30px) rotate(90deg)" : "translateX(0) rotate(0)",
           opacity: isDark ? 0 : 1,
         }}
       >
