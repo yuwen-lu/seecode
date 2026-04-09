@@ -1,4 +1,5 @@
 import type { ArchGraph } from "@/types/graph";
+import { MOCK_SNIPPETS } from "./mock-snippets";
 
 export const MOCK_CLICKY: ArchGraph = {
   repoUrl: "https://github.com/farzaa/clicky",
@@ -337,4 +338,5 @@ export const MOCK_CLICKY: ArchGraph = {
       ],
     },
   ],
+  sourceSnippets: MOCK_SNIPPETS,
 };
