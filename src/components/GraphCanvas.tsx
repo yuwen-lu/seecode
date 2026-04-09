@@ -15,7 +15,7 @@ import {
   type Viewport,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import type { ArchGraph, ArchModule, NodeCategory } from "@/types/graph";
+import type { ArchGraph, ArchModule, NodeCategory, PanelSelection } from "@/types/graph";
 import { ArchNode } from "./ArchNode";
 import { GroupNode, type GroupNodeData } from "./GroupNode";
 import { DetailSlider } from "./DetailSlider";
@@ -28,7 +28,7 @@ import {
 interface GraphCanvasProps {
   graph: ArchGraph;
   activeTrace: string | null;
-  onNodeSelect: (module: ArchModule | null) => void;
+  onSelect: (selection: PanelSelection | null) => void;
   selectedNodeId: string | null;
 }
 
@@ -40,7 +40,7 @@ const nodeTypes = {
 function GraphCanvasInner({
   graph,
   activeTrace,
-  onNodeSelect,
+  onSelect,
   selectedNodeId,
 }: GraphCanvasProps) {
   const { fitView } = useReactFlow();
@@ -147,6 +147,24 @@ function GraphCanvasInner({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [triggerAnimation, scheduleFitView, locked]);
 
+  // When a module is selected whose category is collapsed, expand all to module level
+  useEffect(() => {
+    if (!selectedNodeId) return;
+    // If the selected node already exists in the current layout, nothing to do
+    if (layout.nodes.some((n) => n.id === selectedNodeId)) return;
+    // The selected node is hidden inside a collapsed group — expand all
+    const mod = graph.modules.find((m) => m.id === selectedNodeId);
+    if (mod && !effectiveExpanded.has(mod.category)) {
+      triggerAnimation();
+      pushExpansion(new Set(allCategories));
+      if (zoomLevel === "collapsed") {
+        prevZoomLevel.current = "compact";
+        setZoomLevel("compact");
+      }
+      scheduleFitView();
+    }
+  }, [selectedNodeId]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Track whether this is the first render (skip animation on mount)
   const isInitialRender = useRef(true);
 
@@ -172,10 +190,15 @@ function GraphCanvasInner({
     const trace = graph.traces.find((t) => t.name === activeTrace);
     if (!trace) return;
 
+    // Map trace module IDs through nodeIdMap (handles collapsed groups)
     const traceEdgeSet = new Set<string>();
     for (let i = 0; i < trace.path.length - 1; i++) {
-      traceEdgeSet.add(`${trace.path[i]}->${trace.path[i + 1]}`);
-      traceEdgeSet.add(`${trace.path[i + 1]}->${trace.path[i]}`);
+      const fromId = layout.nodeIdMap.get(trace.path[i]) ?? trace.path[i];
+      const toId = layout.nodeIdMap.get(trace.path[i + 1]) ?? trace.path[i + 1];
+      if (fromId !== toId) {
+        traceEdgeSet.add(`${fromId}->${toId}`);
+        traceEdgeSet.add(`${toId}->${fromId}`);
+      }
     }
 
     setEdges(
@@ -194,26 +217,33 @@ function GraphCanvasInner({
         };
       })
     );
-  }, [activeTrace, graph.traces, layout.edges, setEdges]);
+  }, [activeTrace, graph.traces, layout.edges, layout.nodeIdMap, setEdges]);
 
   // Single click: select node (delayed to avoid firing during double-click)
+  // At system level, clicking a group shows the component panel (no expansion).
+  // At module level, clicking an individual node shows the module panel.
   const onNodeClick = useCallback(
     (_: React.MouseEvent, node: Node) => {
       if (clickTimer.current) clearTimeout(clickTimer.current);
       clickTimer.current = setTimeout(() => {
         clickTimer.current = null;
         if (node.type === "groupNode") {
-          const members = (node.data as { members?: ArchModule[] })?.members;
-          if (members && members.length > 0) {
-            onNodeSelect(members[0]);
-          }
+          const data = node.data as GroupNodeData;
+          onSelect({
+            kind: "component",
+            category: data.category as NodeCategory,
+            label: data.label as string,
+            members: data.members as ArchModule[],
+          });
           return;
         }
         const mod = graph.modules.find((m) => m.id === node.id);
-        onNodeSelect(mod ?? null);
+        if (mod) {
+          onSelect({ kind: "module", module: mod });
+        }
       }, 250);
     },
-    [graph.modules, onNodeSelect]
+    [graph.modules, onSelect]
   );
 
   // Double-click: expand/collapse a group (cancels pending single-click)
@@ -239,15 +269,15 @@ function GraphCanvasInner({
       if (!next) return;
       triggerAnimation();
       pushExpansion(next);
-      onNodeSelect(null);
+      onSelect(null);
       scheduleFitView();
     },
-    [graph.modules, expandedCategories, onNodeSelect, triggerAnimation, pushExpansion, scheduleFitView]
+    [graph.modules, expandedCategories, onSelect, triggerAnimation, pushExpansion, scheduleFitView]
   );
 
   const onPaneClick = useCallback(() => {
-    onNodeSelect(null);
-  }, [onNodeSelect]);
+    onSelect(null);
+  }, [onSelect]);
 
   // Slider level change
   function handleLevelChange(level: ZoomLevel) {
@@ -269,6 +299,18 @@ function GraphCanvasInner({
     ? (zoomLevel === "detailed" ? "detailed" : "compact")
     : "collapsed";
 
+  // Compute which nodes are on the active trace (mapped through nodeIdMap)
+  const traceNodeIds = useMemo(() => {
+    if (!activeTrace) return null;
+    const trace = graph.traces.find((t) => t.name === activeTrace);
+    if (!trace) return null;
+    const ids = new Set<string>();
+    for (const moduleId of trace.path) {
+      ids.add(layout.nodeIdMap.get(moduleId) ?? moduleId);
+    }
+    return ids;
+  }, [activeTrace, graph.traces, layout.nodeIdMap]);
+
   return (
     <>
       <ReactFlow
@@ -278,10 +320,12 @@ function GraphCanvasInner({
             (n.type === "groupNode" && selectedNodeId
               ? ((n.data as { members?: ArchModule[] })?.members ?? []).some((m) => m.id === selectedNodeId)
               : false);
+          const dimmedBySelection = !!selectedNodeId && !isSelected;
+          const dimmedByTrace = !!traceNodeIds && !traceNodeIds.has(n.id);
           return {
             ...n,
             selected: isSelected,
-            data: { ...n.data, dimmed: !!selectedNodeId && !isSelected },
+            data: { ...n.data, dimmed: dimmedBySelection || dimmedByTrace },
           };
         })}
         edges={edges}

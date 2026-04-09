@@ -1,17 +1,17 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback } from "react";
 import { Header, type RenderMode } from "@/components/Header";
 import { GraphCanvas } from "@/components/GraphCanvas";
 import { DetailPanel } from "@/components/DetailPanel";
 import { MermaidDebugView } from "@/components/MermaidDebugView";
 import { StreamingLoader } from "@/components/StreamingLoader";
-import type { ArchGraph, ArchModule, NodeCategory } from "@/types/graph";
+import type { ArchGraph, ArchModule, PanelSelection } from "@/types/graph";
 import { MOCK_CLICKY } from "@/lib/mock-clicky";
 
 export default function Home() {
   const [graph, setGraph] = useState<ArchGraph | null>(MOCK_CLICKY);
-  const [selectedNode, setSelectedNode] = useState<ArchModule | null>(null);
+  const [selection, setSelection] = useState<PanelSelection | null>(null);
   const [activeTrace, setActiveTrace] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -20,8 +20,19 @@ export default function Home() {
   const [streamedText, setStreamedText] = useState("");
   const abortRef = useRef<AbortController | null>(null);
 
+  // Derive the selected node ID for canvas highlighting
+  const selectedNodeId = selection
+    ? selection.kind === "module"
+      ? selection.module.id
+      : `group-${selection.category}`
+    : null;
+
+  // Called from the component panel when drilling into a module
+  const onDrillToModule = useCallback((mod: ArchModule) => {
+    setSelection({ kind: "module", module: mod });
+  }, []);
+
   async function analyzeRepo(url: string) {
-    // Abort any in-flight request
     abortRef.current?.abort();
     const abort = new AbortController();
     abortRef.current = abort;
@@ -29,7 +40,7 @@ export default function Home() {
     setLoading(true);
     setError(null);
     setGraph(null);
-    setSelectedNode(null);
+    setSelection(null);
     setActiveTrace(null);
     setLoadingStatus("Connecting...");
     setStreamedText("");
@@ -43,7 +54,6 @@ export default function Home() {
       });
 
       if (!res.ok || !res.body) {
-        // Try to parse error from body
         let errMsg = `Server error (${res.status})`;
         try {
           const text = await res.text();
@@ -63,9 +73,8 @@ export default function Home() {
 
         buffer += decoder.decode(value, { stream: true });
 
-        // Parse SSE events from buffer
         const lines = buffer.split("\n");
-        buffer = lines.pop() ?? ""; // Keep incomplete line in buffer
+        buffer = lines.pop() ?? "";
 
         let eventType = "";
         for (const line of lines) {
@@ -125,13 +134,23 @@ export default function Home() {
         renderMode={renderMode}
         onRenderModeChange={setRenderMode}
         hasMermaid={!!graph?.mermaid}
-        activeCategories={graph ? [...new Set(graph.modules.map((m) => m.category))] as NodeCategory[] : undefined}
       />
+
+      {/* Trace description bar */}
+      {activeTrace && graph && (() => {
+        const trace = graph.traces.find((t) => t.name === activeTrace);
+        return trace ? (
+          <div className="px-4 py-1.5 bg-surface-2 border-b border-border text-xs text-text-secondary flex items-center gap-2 shrink-0">
+            <span className="text-accent font-medium">{trace.name}</span>
+            <span className="text-text-tertiary">—</span>
+            <span>{trace.description}</span>
+          </div>
+        ) : null;
+      })()}
 
       <div className="flex flex-1 min-h-0">
         {/* Main canvas area */}
         <div className="flex-1 relative">
-          {/* States are mutually exclusive */}
           {loading ? (
             <StreamingLoader
               status={loadingStatus}
@@ -167,8 +186,8 @@ export default function Home() {
             <GraphCanvas
               graph={graph}
               activeTrace={activeTrace}
-              onNodeSelect={setSelectedNode}
-              selectedNodeId={selectedNode?.id ?? null}
+              onSelect={setSelection}
+              selectedNodeId={selectedNodeId}
             />
           )}
 
@@ -188,10 +207,12 @@ export default function Home() {
         </div>
 
         {/* Detail panel */}
-        {selectedNode && (
+        {selection && (
           <DetailPanel
-            module={selectedNode}
-            onClose={() => setSelectedNode(null)}
+            selection={selection}
+            sourceSnippets={graph?.sourceSnippets}
+            onClose={() => setSelection(null)}
+            onDrillToModule={onDrillToModule}
           />
         )}
       </div>
