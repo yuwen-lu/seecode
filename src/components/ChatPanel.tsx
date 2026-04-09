@@ -76,8 +76,8 @@ export function ChatPanel({ modules, onFileClick }: ChatPanelProps) {
     document.addEventListener("mouseup", onMouseUp);
   }, [height]);
 
-  const sendMessage = useCallback(async () => {
-    const text = input.trim();
+  const sendMessage = useCallback(async (overrideText?: string) => {
+    const text = (overrideText ?? input).trim();
     if (!text || isStreaming || !canvasContext) return;
 
     setInput("");
@@ -232,8 +232,8 @@ export function ChatPanel({ modules, onFileClick }: ChatPanelProps) {
           </div>
 
           {/* Input */}
-          <div className="px-3 py-2.5 border-t border-border shrink-0">
-            <div className="flex items-end gap-2 rounded-lg border border-border bg-background px-3 py-2 focus-within:border-accent/40 transition-colors">
+          <div className="px-3 py-2.5 shrink-0">
+            <div className="flex items-center gap-2 rounded-2xl border border-border bg-background px-3 py-1.5 focus-within:border-accent/40 transition-colors">
               <textarea
                 ref={inputRef}
                 value={input}
@@ -241,16 +241,16 @@ export function ChatPanel({ modules, onFileClick }: ChatPanelProps) {
                 onKeyDown={handleKeyDown}
                 placeholder={contextLabel ? `Ask about ${contextLabel}...` : "Ask about this codebase..."}
                 rows={1}
-                className="flex-1 bg-transparent text-sm text-foreground placeholder:text-text-tertiary resize-none outline-none max-h-20 overflow-y-auto"
-                style={{ lineHeight: "1.5" }}
+                className="flex-1 bg-transparent text-sm text-foreground placeholder:text-text-tertiary resize-none outline-none overflow-y-auto py-1"
+                style={{ lineHeight: "1.5", maxHeight: `${1.5 * 14 * 3 + 8}px` }}
               />
               {isStreaming ? (
-                <button onClick={() => abortRef.current?.abort()} className="shrink-0 p-1 rounded text-text-secondary hover:text-foreground transition-colors">
+                <button onClick={() => abortRef.current?.abort()} className="shrink-0 p-1 rounded text-text-secondary hover:text-foreground transition-colors cursor-pointer">
                   <X size={15} />
                 </button>
               ) : (
-                <button onClick={sendMessage} disabled={!input.trim() || !canvasContext}
-                  className="shrink-0 p-1 rounded text-text-secondary hover:text-foreground transition-colors disabled:opacity-30 disabled:pointer-events-none">
+                <button onClick={() => sendMessage()} disabled={!input.trim() || !canvasContext}
+                  className="shrink-0 p-1 rounded text-text-secondary hover:text-foreground transition-colors disabled:opacity-30 disabled:pointer-events-none cursor-pointer">
                   <Send size={15} />
                 </button>
               )}
