@@ -35,7 +35,7 @@ export const ArchNode = memo(function ArchNode({
           width: 260,
           background: colors.bg,
           boxShadow: `0 1px 3px rgba(0,0,0,0.3), inset 0 1px 0 ${colors.border}44`,
-          opacity: dimmed ? 0.25 : 1,
+          opacity: dimmed ? 0.5 : 1,
         }}
       >
         {/* Name */}

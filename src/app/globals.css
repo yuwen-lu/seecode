@@ -74,6 +74,9 @@ body {
   transition: opacity 0.3s ease;
   cursor: pointer !important;
 }
+.react-flow__node:hover > div {
+  opacity: 1 !important;
+}
 /* During seeding phase, disable transitions so nodes jump to seed positions */
 .react-flow--seeding .react-flow__node {
   transition: none !important;

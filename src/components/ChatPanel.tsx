@@ -195,7 +195,7 @@ export function ChatPanel({ modules, onFileClick }: ChatPanelProps) {
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-2.5 border-b border-border shrink-0">
             <span className="text-xs font-medium text-text-secondary truncate">
-              {contextLabel ? `Asking about ${contextLabel}` : "Chat"}
+              Chat
             </span>
             <div className="flex items-center gap-1 shrink-0">
               {messages.length > 0 && (

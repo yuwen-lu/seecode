@@ -35,7 +35,7 @@ export const GroupNode = memo(function GroupNode({
           width: 280,
           background: colors.bg,
           boxShadow: `0 1px 4px rgba(0,0,0,0.35), inset 0 1px 0 ${colors.border}44`,
-          opacity: data.dimmed ? 0.25 : 1,
+          opacity: data.dimmed ? 0.5 : 1,
         }}
       >
         {/* Category + group name */}

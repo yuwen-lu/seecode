@@ -69,6 +69,8 @@ function GraphCanvasInner({
     });
   }, []);
 
+  const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
+
   const clickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [animClass, setAnimClass] = useState<"" | "react-flow--seeding" | "react-flow--morphing" | "react-flow--animating">("");
   const animTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -368,6 +370,14 @@ function GraphCanvasInner({
     onSelect(null);
   }, [onSelect]);
 
+  const onNodeMouseEnter = useCallback((_: React.MouseEvent, node: Node) => {
+    setHoveredNodeId(node.id);
+  }, []);
+
+  const onNodeMouseLeave = useCallback(() => {
+    setHoveredNodeId(null);
+  }, []);
+
   // Slider level change
   function handleLevelChange(level: ZoomLevel) {
     prevZoomLevel.current = level;
@@ -437,19 +447,25 @@ function GraphCanvasInner({
         })}
         edges={edges.map((e) => {
           if (!selectedNodeId && !traceNodeIds) return e;
-          // When a node is selected, only highlight edges connected to it
           if (selectedNodeId) {
-            const connected = e.source === selectedNodeId || e.target === selectedNodeId ||
-              // Also check if edge connects to a group containing the selected module
+            const connectedToSelected = e.source === selectedNodeId || e.target === selectedNodeId ||
               nodes.some((n) =>
                 n.type === "groupNode" &&
                 (n.id === e.source || n.id === e.target) &&
                 ((n.data as { members?: ArchModule[] })?.members ?? []).some((m) => m.id === selectedNodeId)
               );
+            const connectedToHovered = hoveredNodeId && !connectedToSelected && (
+              e.source === hoveredNodeId || e.target === hoveredNodeId ||
+              nodes.some((n) =>
+                n.type === "groupNode" &&
+                (n.id === e.source || n.id === e.target) &&
+                ((n.data as { members?: ArchModule[] })?.members ?? []).some((m) => m.id === hoveredNodeId)
+              )
+            );
             return {
               ...e,
-              style: { ...e.style, opacity: connected ? 1 : 0.08 },
-              labelStyle: { ...e.labelStyle, opacity: connected ? 1 : 0 },
+              style: { ...e.style, opacity: connectedToSelected ? 1 : connectedToHovered ? 1 : 0.5 },
+              labelStyle: { ...e.labelStyle, opacity: connectedToSelected ? 1 : connectedToHovered ? 1 : 0.5 },
             };
           }
           return e;
@@ -458,6 +474,8 @@ function GraphCanvasInner({
         onEdgesChange={onEdgesChange}
         onNodeClick={onNodeClick}
         onNodeDoubleClick={onNodeDoubleClick}
+        onNodeMouseEnter={onNodeMouseEnter}
+        onNodeMouseLeave={onNodeMouseLeave}
         onPaneClick={onPaneClick}
         nodeTypes={nodeTypes}
         fitView
