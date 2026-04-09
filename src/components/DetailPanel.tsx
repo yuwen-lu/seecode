@@ -89,7 +89,7 @@ export function DetailPanel({ selection, repoUrl, commitSha, onClose, onViewChan
 
   return (
     <div
-      className="shrink-0 bg-surface-1 border-r border-border flex flex-col h-full overflow-hidden relative"
+      className="absolute left-0 top-0 bottom-0 z-20 bg-surface-1/95 backdrop-blur-sm border-r border-border flex flex-col overflow-hidden animate-slide-in-left"
       style={{ width }}
     >
       {/* Resize handle */}

@@ -252,8 +252,8 @@ export default function Home() {
         ) : null;
       })()}
 
-      <div className="flex flex-1 min-h-0">
-        {/* Detail panel — LEFT side */}
+      <div className="flex-1 min-h-0 relative">
+        {/* Detail panel — floating on LEFT side over canvas */}
         {selection && (
           <DetailPanel
             selection={selection}
@@ -265,8 +265,8 @@ export default function Home() {
           />
         )}
 
-        {/* Canvas — fills remaining space */}
-        <div className="flex-1 relative">
+        {/* Canvas — fills full space */}
+        <div className="absolute inset-0">
           {showHome && (
             <HomeView onAnalyze={analyzeRepo} mockGraph={MOCK_CLICKY} onLoadGraph={loadGraph} />
           )}
