@@ -408,7 +408,7 @@ function ModuleBody({
             )}
           </div>
         )}
-        <div className="flex-1 overflow-auto hide-scrollbar text-[11px] leading-relaxed">
+        <div className="flex-1 overflow-auto subtle-scrollbar text-[11px] leading-relaxed">
           {loadingSource ? (
             <div className="p-3 text-text-tertiary text-[11px]">Loading source...</div>
           ) : sourceError ? (
@@ -541,7 +541,7 @@ function FileBody({
           <p className="text-[11px] text-text-tertiary italic">{error}</p>
         </div>
       ) : sourceCode ? (
-        <div className="flex-1 overflow-auto hide-scrollbar text-[11px] leading-relaxed">
+        <div className="flex-1 overflow-auto subtle-scrollbar text-[11px] leading-relaxed">
           {highlightedHtml ? (
             <div
               className="shiki-container"
@@ -621,7 +621,7 @@ function CodeLightbox({
         </div>
 
         {/* Code */}
-        <div className="flex-1 overflow-auto text-[12px] leading-relaxed">
+        <div className="flex-1 overflow-auto subtle-scrollbar text-[12px] leading-relaxed">
           {highlightedHtml ? (
             <div
               className="shiki-container"

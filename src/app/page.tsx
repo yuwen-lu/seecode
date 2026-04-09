@@ -6,7 +6,7 @@ import { GraphCanvas } from "@/components/GraphCanvas";
 import { DetailPanel, type PanelDepth } from "@/components/DetailPanel";
 import { MermaidDebugView } from "@/components/MermaidDebugView";
 import { StreamingLoader } from "@/components/StreamingLoader";
-import type { ArchGraph, PanelSelection } from "@/types/graph";
+import type { ArchGraph, NodeCategory, PanelSelection } from "@/types/graph";
 import { MOCK_CLICKY } from "@/lib/mock-clicky";
 
 interface RepoEntry {
@@ -45,6 +45,7 @@ export default function Home() {
   // When the panel navigates to a module (e.g., from component view),
   // override the highlight so the canvas shows which node/group is relevant
   const [highlightOverride, setHighlightOverride] = useState<string | null>(null);
+  const [panelExpandedCategory, setPanelExpandedCategory] = useState<NodeCategory | null>(null);
 
   const selectedNodeId = highlightOverride
     ?? (selection
@@ -53,13 +54,22 @@ export default function Home() {
         : `group-${selection.category}`
       : null);
 
-  const onPanelViewChange = useCallback((_depth: PanelDepth, moduleId: string | null) => {
+  // Panel reports view changes — update highlight + expansion request
+  const onPanelViewChange = useCallback((depth: PanelDepth, moduleId: string | null) => {
     setHighlightOverride(moduleId);
-  }, []);
+    if ((depth === "module" || depth === "file") && moduleId && graph) {
+      const mod = graph.modules.find((m) => m.id === moduleId);
+      setPanelExpandedCategory(mod?.category ?? null);
+    } else {
+      setPanelExpandedCategory(null);
+    }
+  }, [graph]);
 
+  // Selection from canvas click — clears panel state
   const handleSelect = useCallback((sel: PanelSelection | null) => {
     setSelection(sel);
     setHighlightOverride(null);
+    setPanelExpandedCategory(null);
   }, []);
 
   function loadGraph(g: ArchGraph) {
@@ -68,6 +78,7 @@ export default function Home() {
     setActiveTrace(null);
     setError(null);
     setHighlightOverride(null);
+    setPanelExpandedCategory(null);
     saveRecentRepo({
       repoUrl: g.repoUrl,
       repoName: g.repoName,
@@ -84,6 +95,7 @@ export default function Home() {
     setError(null);
     setStreamedText("");
     setHighlightOverride(null);
+    setPanelExpandedCategory(null);
   }
 
   async function analyzeRepo(url: string) {
@@ -242,6 +254,8 @@ export default function Home() {
               activeTrace={activeTrace}
               onSelect={handleSelect}
               selectedNodeId={selectedNodeId}
+              panelExpandedCategory={panelExpandedCategory}
+              panelOpen={!!selection}
             />
           )}
 

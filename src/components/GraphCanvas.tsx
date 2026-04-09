@@ -30,6 +30,8 @@ interface GraphCanvasProps {
   activeTrace: string | null;
   onSelect: (selection: PanelSelection | null) => void;
   selectedNodeId: string | null;
+  panelExpandedCategory?: NodeCategory | null;
+  panelOpen?: boolean;
 }
 
 const nodeTypes = {
@@ -42,6 +44,8 @@ function GraphCanvasInner({
   activeTrace,
   onSelect,
   selectedNodeId,
+  panelExpandedCategory,
+  panelOpen,
 }: GraphCanvasProps) {
   const { fitView } = useReactFlow();
   const [zoomLevel, setZoomLevel] = useState<ZoomLevel>("collapsed");
@@ -153,6 +157,33 @@ function GraphCanvasInner({
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [triggerAnimation, scheduleFitView, locked]);
+
+  // Sync canvas expansion with panel drill-down (expand/collapse single category)
+  const panelPrevCategory = useRef<NodeCategory | null>(null);
+  useEffect(() => {
+    const prev = panelPrevCategory.current;
+    const next = panelExpandedCategory ?? null;
+    panelPrevCategory.current = next;
+
+    if (next && next !== prev) {
+      if (!expandedCategories.has(next)) {
+        const updated = new Set(expandedCategories);
+        updated.add(next);
+        triggerAnimation();
+        pushExpansion(updated);
+        const memberIds = graph.modules.filter((m) => m.category === next).map((m) => m.id);
+        scheduleFitView(memberIds);
+      }
+    } else if (!next && prev) {
+      if (expandedCategories.has(prev)) {
+        const updated = new Set(expandedCategories);
+        updated.delete(prev);
+        triggerAnimation();
+        pushExpansion(updated);
+        scheduleFitView();
+      }
+    }
+  }, [panelExpandedCategory]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Track whether this is the first render (skip animation on mount)
   const isInitialRender = useRef(true);
@@ -313,7 +344,7 @@ function GraphCanvasInner({
     [graph.modules, onSelect]
   );
 
-  // Double-click: expand/collapse a group (cancels pending single-click)
+  // Double-click: only drill down (never collapse, never close panel)
   const onNodeDoubleClick = useCallback(
     (_: React.MouseEvent, node: Node) => {
       if (clickTimer.current) {
@@ -321,23 +352,23 @@ function GraphCanvasInner({
         clickTimer.current = null;
       }
 
-      let next: Set<NodeCategory> | null = null;
       if (node.type === "groupNode") {
+        // Expand this group (drill down)
         const category = (node.data as GroupNodeData).category as NodeCategory;
-        next = new Set(expandedCategories);
-        next.add(category);
+        if (!expandedCategories.has(category)) {
+          const next = new Set(expandedCategories);
+          next.add(category);
+          triggerAnimation();
+          pushExpansion(next);
+          scheduleFitView();
+        }
       } else {
+        // Double-click module → open module panel
         const mod = graph.modules.find((m) => m.id === node.id);
-        if (mod && expandedCategories.has(mod.category)) {
-          next = new Set(expandedCategories);
-          next.delete(mod.category);
+        if (mod) {
+          onSelect({ kind: "module", module: mod });
         }
       }
-      if (!next) return;
-      triggerAnimation();
-      pushExpansion(next);
-      onSelect(null);
-      scheduleFitView();
     },
     [graph.modules, expandedCategories, onSelect, triggerAnimation, pushExpansion, scheduleFitView]
   );
@@ -413,12 +444,14 @@ function GraphCanvasInner({
         <Controls position="bottom-left" showInteractive={false} />
       </ReactFlow>
 
-      <DetailSlider
-        level={displayLevel}
-        locked={locked}
-        onLevelChange={handleLevelChange}
-        onLockedChange={setLocked}
-      />
+      {!panelOpen && (
+        <DetailSlider
+          level={displayLevel}
+          locked={locked}
+          onLevelChange={handleLevelChange}
+          onLockedChange={setLocked}
+        />
+      )}
     </>
   );
 }
