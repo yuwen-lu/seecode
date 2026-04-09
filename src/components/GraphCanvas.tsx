@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ReactFlow,
   Background,
-  Controls,
   useNodesState,
   useEdgesState,
   useReactFlow,
@@ -24,6 +23,7 @@ import {
   buildHybridGraph,
   type ZoomLevel,
 } from "@/lib/semantic-zoom";
+import { useTheme } from "next-themes";
 
 interface GraphCanvasProps {
   graph: ArchGraph;
@@ -32,6 +32,7 @@ interface GraphCanvasProps {
   selectedNodeId: string | null;
   panelExpandedCategory?: NodeCategory | null;
   panelOpen?: boolean;
+  chatHighlights?: Set<string>;
 }
 
 const nodeTypes = {
@@ -46,8 +47,11 @@ function GraphCanvasInner({
   selectedNodeId,
   panelExpandedCategory,
   panelOpen,
+  chatHighlights,
 }: GraphCanvasProps) {
   const { fitView } = useReactFlow();
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
   const [zoomLevel, setZoomLevel] = useState<ZoomLevel>("collapsed");
   const [locked, setLocked] = useState(true); // Default locked since we use double-click now
   const prevZoomLevel = useRef<ZoomLevel>("collapsed");
@@ -68,8 +72,10 @@ function GraphCanvasInner({
     });
   }, []);
 
+  const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
+
   const clickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [animClass, setAnimClass] = useState<"" | "react-flow--seeding" | "react-flow--morphing" | "react-flow--animating">("");
+  const [animClass, setAnimClass] = useState<"" | "react-flow--seeding" | "react-flow--morphing" | "react-flow--animating" | "react-flow--entering">("react-flow--entering");
   const animTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fitViewTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -158,30 +164,20 @@ function GraphCanvasInner({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [triggerAnimation, scheduleFitView, locked]);
 
-  // Sync canvas expansion with panel drill-down (expand/collapse single category)
+  // Panel drill-down requests category expansion (one-way: expand only, never collapse)
   const panelPrevCategory = useRef<NodeCategory | null>(null);
   useEffect(() => {
     const prev = panelPrevCategory.current;
     const next = panelExpandedCategory ?? null;
     panelPrevCategory.current = next;
 
-    if (next && next !== prev) {
-      if (!expandedCategories.has(next)) {
-        const updated = new Set(expandedCategories);
-        updated.add(next);
-        triggerAnimation();
-        pushExpansion(updated);
-        const memberIds = graph.modules.filter((m) => m.category === next).map((m) => m.id);
-        scheduleFitView(memberIds);
-      }
-    } else if (!next && prev) {
-      if (expandedCategories.has(prev)) {
-        const updated = new Set(expandedCategories);
-        updated.delete(prev);
-        triggerAnimation();
-        pushExpansion(updated);
-        scheduleFitView();
-      }
+    if (next && next !== prev && !expandedCategories.has(next)) {
+      const updated = new Set(expandedCategories);
+      updated.add(next);
+      triggerAnimation();
+      pushExpansion(updated);
+      const memberIds = graph.modules.filter((m) => m.category === next).map((m) => m.id);
+      scheduleFitView(memberIds);
     }
   }, [panelExpandedCategory]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -196,9 +192,15 @@ function GraphCanvasInner({
   useEffect(() => {
     if (isInitialRender.current) {
       isInitialRender.current = false;
+
       setNodes(layout.nodes);
       setEdges(layout.edges);
       setTimeout(() => fitView({ padding: 0.12, duration: 300 }), 100);
+
+      // Clear entering class after entrance animations finish
+      if (animTimer.current) clearTimeout(animTimer.current);
+      animTimer.current = setTimeout(() => setAnimClass(""), 1200);
+
       // Store initial positions
       for (const n of layout.nodes) {
         prevNodePositions.current.set(n.id, { ...n.position });
@@ -308,7 +310,7 @@ function GraphCanvasInner({
           animated: isOnTrace,
           style: {
             ...edge.style,
-            stroke: isOnTrace ? "#7aa2f7" : (edge.style?.stroke ?? "#5a6080"),
+            stroke: isOnTrace ? "var(--accent)" : (edge.style?.stroke ?? "var(--edge-default)"),
             strokeWidth: isOnTrace ? 3 : (Number(edge.style?.strokeWidth) || 1.5),
             opacity: isOnTrace ? 1 : 0.3,
           },
@@ -377,6 +379,14 @@ function GraphCanvasInner({
     onSelect(null);
   }, [onSelect]);
 
+  const onNodeMouseEnter = useCallback((_: React.MouseEvent, node: Node) => {
+    setHoveredNodeId(node.id);
+  }, []);
+
+  const onNodeMouseLeave = useCallback(() => {
+    setHoveredNodeId(null);
+  }, []);
+
   // Slider level change
   function handleLevelChange(level: ZoomLevel) {
     prevZoomLevel.current = level;
@@ -437,24 +447,35 @@ function GraphCanvasInner({
               dimmed: dimmedBySelection || dimmedByTrace,
               // Individual nodes always show at least compact; group nodes stay collapsed
               zoomLevel: n.type === "groupNode" ? zoomLevel : (zoomLevel === "collapsed" ? "compact" : zoomLevel),
+              isDark,
+              highlighted: chatHighlights?.has(n.id) ||
+                (n.type === "groupNode" && chatHighlights
+                  ? ((n.data as { members?: ArchModule[] })?.members ?? []).some((m) => chatHighlights.has(m.id))
+                  : false),
             },
           };
         })}
         edges={edges.map((e) => {
           if (!selectedNodeId && !traceNodeIds) return e;
-          // When a node is selected, only highlight edges connected to it
           if (selectedNodeId) {
-            const connected = e.source === selectedNodeId || e.target === selectedNodeId ||
-              // Also check if edge connects to a group containing the selected module
+            const connectedToSelected = e.source === selectedNodeId || e.target === selectedNodeId ||
               nodes.some((n) =>
                 n.type === "groupNode" &&
                 (n.id === e.source || n.id === e.target) &&
                 ((n.data as { members?: ArchModule[] })?.members ?? []).some((m) => m.id === selectedNodeId)
               );
+            const connectedToHovered = hoveredNodeId && !connectedToSelected && (
+              e.source === hoveredNodeId || e.target === hoveredNodeId ||
+              nodes.some((n) =>
+                n.type === "groupNode" &&
+                (n.id === e.source || n.id === e.target) &&
+                ((n.data as { members?: ArchModule[] })?.members ?? []).some((m) => m.id === hoveredNodeId)
+              )
+            );
             return {
               ...e,
-              style: { ...e.style, opacity: connected ? 1 : 0.08 },
-              labelStyle: { ...e.labelStyle, opacity: connected ? 1 : 0 },
+              style: { ...e.style, opacity: connectedToSelected ? 1 : connectedToHovered ? 1 : 0.5 },
+              labelStyle: { ...e.labelStyle, opacity: connectedToSelected ? 1 : connectedToHovered ? 1 : 0.5 },
             };
           }
           return e;
@@ -463,6 +484,8 @@ function GraphCanvasInner({
         onEdgesChange={onEdgesChange}
         onNodeClick={onNodeClick}
         onNodeDoubleClick={onNodeDoubleClick}
+        onNodeMouseEnter={onNodeMouseEnter}
+        onNodeMouseLeave={onNodeMouseLeave}
         onPaneClick={onPaneClick}
         nodeTypes={nodeTypes}
         fitView
@@ -472,18 +495,16 @@ function GraphCanvasInner({
         panOnScroll
         proOptions={{ hideAttribution: true }}
       >
-        <Background color="#1a1a2a" gap={20} size={1} />
-        <Controls position="bottom-left" showInteractive={false} />
+        <Background color="var(--grid-dot)" gap={20} size={1} />
       </ReactFlow>
 
-      {!panelOpen && (
-        <DetailSlider
-          level={displayLevel}
-          locked={locked}
-          onLevelChange={handleLevelChange}
-          onLockedChange={setLocked}
-        />
-      )}
+      <DetailSlider
+        level={displayLevel}
+        locked={locked}
+        onLevelChange={handleLevelChange}
+        onLockedChange={setLocked}
+        position="bottom-left"
+      />
     </>
   );
 }

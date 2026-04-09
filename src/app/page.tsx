@@ -6,8 +6,11 @@ import { GraphCanvas } from "@/components/GraphCanvas";
 import { DetailPanel, type PanelDepth } from "@/components/DetailPanel";
 import { MermaidDebugView } from "@/components/MermaidDebugView";
 import { StreamingLoader } from "@/components/StreamingLoader";
+import { ChatPanel } from "@/components/ChatPanel";
 import type { ArchGraph, NodeCategory, PanelSelection } from "@/types/graph";
 import { MOCK_CLICKY } from "@/lib/mock-clicky";
+import { useChatStore } from "@/store/chat-store";
+import { buildCanvasContext } from "@/lib/canvas-context";
 
 interface RepoEntry {
   repoUrl: string;
@@ -46,7 +49,14 @@ export default function Home() {
   // override the highlight so the canvas shows which node/group is relevant
   const [highlightOverride, setHighlightOverride] = useState<string | null>(null);
   const [panelExpandedCategory, setPanelExpandedCategory] = useState<NodeCategory | null>(null);
+  const [panelDepth, setPanelDepth] = useState<PanelDepth | null>(null);
+  const [activeFile, setActiveFile] = useState<string | null>(null);
+  const [initialFile, setInitialFile] = useState<string | null>(null);
 
+  // Chat integration
+  const chatHighlights = useChatStore((s) => s.highlights);
+  const setCanvasContext = useChatStore((s) => s.setCanvasContext);
+  const setChatRepoKey = useChatStore((s) => s.setRepoKey);
   const selectedNodeId = highlightOverride
     ?? (selection
       ? selection.kind === "module"
@@ -55,8 +65,10 @@ export default function Home() {
       : null);
 
   // Panel reports view changes — update highlight + expansion request
-  const onPanelViewChange = useCallback((depth: PanelDepth, moduleId: string | null) => {
+  const onPanelViewChange = useCallback((depth: PanelDepth, moduleId: string | null, file?: string) => {
     setHighlightOverride(moduleId);
+    setPanelDepth(depth);
+    setActiveFile(file ?? null);
     if ((depth === "module" || depth === "file") && moduleId && graph) {
       const mod = graph.modules.find((m) => m.id === moduleId);
       setPanelExpandedCategory(mod?.category ?? null);
@@ -69,10 +81,8 @@ export default function Home() {
   const handleSelect = useCallback((sel: PanelSelection | null) => {
     setSelection(sel);
     setHighlightOverride(null);
-    // Only reset expansion when closing the panel, not when switching between nodes
-    if (!sel) {
-      setPanelExpandedCategory(null);
-    }
+    setInitialFile(null);
+    // Don't touch panelExpandedCategory — canvas expansion is independent of panel open/close
   }, []);
 
   function loadGraph(g: ArchGraph) {
@@ -88,6 +98,30 @@ export default function Home() {
       analyzedAt: g.analyzedAt ?? new Date().toISOString(),
     });
   }
+
+  // Sync canvas context to chat store
+  useEffect(() => {
+    if (!graph) return;
+    const ctx = buildCanvasContext(graph, selection, "system", activeTrace, panelDepth, activeFile);
+    setCanvasContext(ctx);
+  }, [graph, selection, activeTrace, panelDepth, activeFile, setCanvasContext]);
+
+  // Init chat store when graph loads
+  useEffect(() => {
+    if (graph) setChatRepoKey(graph.repoUrl);
+  }, [graph, setChatRepoKey]);
+
+  // Handle file click from chat — expand category, select module, open file
+  const handleChatFileClick = useCallback((filePath: string, moduleId: string, category: NodeCategory) => {
+    if (!graph) return;
+    const mod = graph.modules.find((m) => m.id === moduleId);
+    if (mod) {
+      setSelection({ kind: "module", module: mod });
+      setHighlightOverride(moduleId);
+      setPanelExpandedCategory(category);
+      setInitialFile(filePath);
+    }
+  }, [graph]);
 
   function goHome() {
     abortRef.current?.abort();
@@ -218,8 +252,21 @@ export default function Home() {
         ) : null;
       })()}
 
-      <div className="flex flex-1 min-h-0">
-        <div className="flex-1 relative">
+      <div className="flex-1 min-h-0 relative">
+        {/* Detail panel — floating on LEFT side over canvas */}
+        {selection && (
+          <DetailPanel
+            selection={selection}
+            repoUrl={graph?.repoUrl ?? ""}
+            commitSha={graph?.commitSha ?? ""}
+            onClose={() => handleSelect(null)}
+            onViewChange={onPanelViewChange}
+            initialFile={initialFile}
+          />
+        )}
+
+        {/* Canvas — fills full space */}
+        <div className="absolute inset-0">
           {showHome && (
             <HomeView onAnalyze={analyzeRepo} mockGraph={MOCK_CLICKY} onLoadGraph={loadGraph} />
           )}
@@ -259,6 +306,7 @@ export default function Home() {
               selectedNodeId={selectedNodeId}
               panelExpandedCategory={panelExpandedCategory}
               panelOpen={!!selection}
+              chatHighlights={chatHighlights}
             />
           )}
 
@@ -274,17 +322,12 @@ export default function Home() {
             )
           )}
         </div>
-
-        {selection && (
-          <DetailPanel
-            selection={selection}
-            repoUrl={graph?.repoUrl ?? ""}
-            commitSha={graph?.commitSha ?? ""}
-            onClose={() => handleSelect(null)}
-            onViewChange={onPanelViewChange}
-          />
-        )}
       </div>
+
+      {/* Chat panel — floating bottom-right overlay */}
+      {graph && renderMode === "reactflow" && (
+        <ChatPanel modules={graph.modules} onFileClick={handleChatFileClick} />
+      )}
     </div>
   );
 }

@@ -1,15 +1,48 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 
+/* ─── Light mode (default, Krea-inspired) ─── */
 :root {
-  --background: #0a0a0f;
-  --foreground: #e0e0e8;
-  --surface-1: #101018;
-  --surface-2: #16162a;
-  --border: #1e1e2e;
-  --border-strong: #2a2a3a;
-  --text-secondary: #888;
-  --text-tertiary: #555;
-  --accent: #7aa2f7;
+  --background: #fafafa;
+  --foreground: #1a1a1a;
+  --surface-1: #ffffff;
+  --surface-2: #f0f0f0;
+  --border: #e5e5e5;
+  --border-strong: #d4d4d4;
+  --text-secondary: #3d3d3d;
+  --text-tertiary: #636366;
+  --accent: #e07a3a;
+  --grid-dot: #d4d4d4;
+  --edge-default: #c0c0c0;
+  --edge-weak: #d4d4d4;
+  --edge-dataflow: #b08968;
+  --edge-label: #888;
+  --edge-label-bg: #fafafa;
+  --scrollbar: rgba(0, 0, 0, 0.1);
+  --scrollbar-hover: rgba(0, 0, 0, 0.2);
+  --node-shadow: none;
+}
+
+/* ─── Dark mode ─── */
+.dark {
+  --background: #0c0c0e;
+  --foreground: #e2e2e6;
+  --surface-1: #131315;
+  --surface-2: #1a1a1e;
+  --border: #232326;
+  --border-strong: #2e2e32;
+  --text-secondary: #bbbbc4;
+  --text-tertiary: #9a9aa6;
+  --accent: #e8945a;
+  --grid-dot: #1e1e22;
+  --edge-default: #3a3a42;
+  --edge-weak: #2a2a30;
+  --edge-dataflow: #8a7060;
+  --edge-label: #555;
+  --edge-label-bg: #0c0c0e;
+  --scrollbar: rgba(255, 255, 255, 0.12);
+  --scrollbar-hover: rgba(255, 255, 255, 0.25);
+  --node-shadow: rgba(0, 0, 0, 0.3);
 }
 
 @theme inline {
@@ -29,9 +62,9 @@
   --color-cat-core: #3b82f6;
   --color-cat-voice: #22c55e;
   --color-cat-visual: #a855f7;
-  --color-cat-ai: #f59e0b;
+  --color-cat-ai: #e8945a;
   --color-cat-proxy: #06b6d4;
-  --color-cat-external: #ef4444;
+  --color-cat-external: #f472b6;
   --color-cat-utility: #64748b;
   --color-cat-data: #ec4899;
   --color-cat-config: #8b5cf6;
@@ -42,62 +75,62 @@ body {
   color: var(--foreground);
 }
 
-/* React Flow overrides for dark theme */
+/* React Flow overrides */
 .react-flow__background {
   background: var(--background) !important;
 }
 
-.react-flow__minimap {
-  background: var(--surface-1) !important;
-  border: 1px solid var(--border) !important;
-  border-radius: 8px !important;
+/* ─── Initial entrance animation ─── */
+.react-flow--entering .react-flow__edge {
+  animation: edge-enter 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: 300ms;
 }
 
-.react-flow__controls {
-  background: var(--surface-1) !important;
-  border: 1px solid var(--border) !important;
-  border-radius: 8px !important;
+@keyframes edge-enter {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
-.react-flow__controls button {
-  background: var(--surface-1) !important;
-  border-color: var(--border) !important;
-  color: var(--foreground) !important;
+.react-flow--entering .react-flow__background {
+  animation: grid-enter 0.8s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-.react-flow__controls button:hover {
-  background: var(--surface-2) !important;
+@keyframes grid-enter {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 /* Smooth node transitions */
 .react-flow__node {
   transition: opacity 0.3s ease;
+  cursor: pointer !important;
 }
-/* During seeding phase, disable transitions so nodes jump to seed positions */
+.react-flow__node > div {
+  transition: opacity 0.2s ease;
+}
+.react-flow__node:hover > div {
+  opacity: 1 !important;
+}
 .react-flow--seeding .react-flow__node {
   transition: none !important;
 }
-/* During morph phase, animate position + opacity smoothly */
 .react-flow--morphing .react-flow__node {
   transition: transform 0.45s cubic-bezier(0.25, 0.1, 0.25, 1),
               opacity 0.3s ease;
 }
-/* Legacy class for other expand/collapse triggers */
 .react-flow--animating .react-flow__node {
   transition: transform 0.45s cubic-bezier(0.25, 0.1, 0.25, 1),
               opacity 0.3s ease;
 }
 
-/* Edge transitions — smooth opacity for selection dimming */
+/* Edge transitions */
 .react-flow__edge {
   transition: opacity 0.3s ease;
 }
-/* During seeding, hide edges completely */
 .react-flow--seeding .react-flow__edge {
   opacity: 0 !important;
   transition: none !important;
 }
-/* During morph, edges fade in with delay after nodes settle */
 .react-flow--morphing .react-flow__edge {
   opacity: 0;
   animation: edge-fade-in 0.35s ease 0.35s forwards;
@@ -108,7 +141,22 @@ body {
   to { opacity: 1; }
 }
 
-/* Edge labels — quieter styling */
+/* Detail slider entrance */
+@keyframes slider-enter {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-slider-enter {
+  animation: slider-enter 0.4s cubic-bezier(0.22, 1, 0.36, 1) 0.3s both;
+}
+
+/* Edge labels */
 .react-flow__edgelabel-renderer span {
   font-family: var(--font-sans), system-ui, sans-serif;
 }
@@ -120,64 +168,64 @@ body {
   background: transparent !important;
   font-size: 11px;
   line-height: 1.6;
-  overflow: visible; /* let parent handle scrolling */
+  overflow: visible;
 }
 
 .shiki-container code {
   font-family: var(--font-mono), ui-monospace, monospace;
 }
 
-/* Global custom scrollbars — dark mode */
+/* Scrollbars */
 * {
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
+  scrollbar-color: var(--scrollbar) transparent;
 }
 
-*::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+*::-webkit-scrollbar { width: 6px; height: 6px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb { background-color: var(--scrollbar); border-radius: 3px; }
+*::-webkit-scrollbar-thumb:hover { background-color: var(--scrollbar-hover); }
+*::-webkit-scrollbar-corner { background: transparent; }
+
+.subtle-scrollbar { scrollbar-color: transparent transparent; }
+.subtle-scrollbar:hover { scrollbar-color: var(--scrollbar) transparent; }
+.subtle-scrollbar::-webkit-scrollbar-thumb { background-color: transparent; }
+.subtle-scrollbar:hover::-webkit-scrollbar-thumb { background-color: var(--scrollbar); }
+.subtle-scrollbar::-webkit-scrollbar-thumb:hover { background-color: var(--scrollbar-hover); }
+
+/* Detail panel slide-in */
+@keyframes slide-in-left {
+  from { transform: translateX(-20%); opacity: 0.5; }
+  to { transform: translateX(0); opacity: 1; }
+}
+.animate-slide-in-left {
+  animation: slide-in-left 0.2s ease-out;
 }
 
-*::-webkit-scrollbar-track {
-  background: transparent;
+/* Chat-referenced node highlight */
+.node-chat-highlight {
+  position: relative;
+}
+.node-chat-highlight::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  border: 1.5px solid var(--accent);
+  opacity: 0.5;
+  pointer-events: none;
 }
 
-*::-webkit-scrollbar-thumb {
-  background-color: rgba(255, 255, 255, 0.12);
-  border-radius: 3px;
-}
+/* Hide scrollbar */
+.hide-scrollbar::-webkit-scrollbar { display: none; }
+.hide-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
 
-*::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(255, 255, 255, 0.25);
-}
-
-*::-webkit-scrollbar-corner {
-  background: transparent;
-}
-
-/* Subtle scrollbar — only visible on hover */
-.subtle-scrollbar {
-  scrollbar-color: transparent transparent;
-}
-.subtle-scrollbar:hover {
-  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
-}
-
-.subtle-scrollbar::-webkit-scrollbar-thumb {
-  background-color: transparent;
-}
-.subtle-scrollbar:hover::-webkit-scrollbar-thumb {
-  background-color: rgba(255, 255, 255, 0.15);
-}
-.subtle-scrollbar::-webkit-scrollbar-thumb:hover {
-  background-color: rgba(255, 255, 255, 0.3);
-}
-
-/* Hide scrollbar completely */
-.hide-scrollbar::-webkit-scrollbar {
-  display: none;
-}
-.hide-scrollbar {
-  scrollbar-width: none;
-  -ms-overflow-style: none;
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .react-flow--entering .react-flow__edge,
+  .react-flow--entering .react-flow__background,
+  .animate-slider-enter {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+  }
 }

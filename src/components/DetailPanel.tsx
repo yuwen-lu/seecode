@@ -2,8 +2,9 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Copy, Check, ChevronRight, ChevronLeft, Maximize2, X } from "lucide-react";
+import { useTheme } from "next-themes";
 import type { ArchModule, PanelSelection, NodeCategory } from "@/types/graph";
-import { CATEGORY_COLORS, CATEGORY_LABELS, githubRawUrl } from "@/types/graph";
+import { getCategoryColors, CATEGORY_LABELS, githubRawUrl } from "@/types/graph";
 
 type PanelView =
   | { level: "component"; category: NodeCategory; label: string; members: ArchModule[] }
@@ -17,10 +18,11 @@ interface DetailPanelProps {
   repoUrl: string;
   commitSha: string;
   onClose: () => void;
-  onViewChange: (depth: PanelDepth, moduleId: string | null) => void;
+  onViewChange: (depth: PanelDepth, moduleId: string | null, file?: string) => void;
+  initialFile?: string | null;
 }
 
-export function DetailPanel({ selection, repoUrl, commitSha, onClose, onViewChange }: DetailPanelProps) {
+export function DetailPanel({ selection, repoUrl, commitSha, onClose, onViewChange, initialFile }: DetailPanelProps) {
   const [width, setWidth] = useState(400);
   const isResizing = useRef(false);
 
@@ -32,13 +34,25 @@ export function DetailPanel({ selection, repoUrl, commitSha, onClose, onViewChan
     setViewStack(selectionToView(selection));
   }, [selection]);
 
+  // Navigate to file when initialFile is set (from chat panel)
+  useEffect(() => {
+    if (!initialFile) return;
+    if (selection.kind === "module") {
+      const mod = selection.module;
+      if (mod.files.includes(initialFile)) {
+        setViewStack((prev) => [...prev, { level: "file", module: mod, file: initialFile }]);
+      }
+    }
+  }, [initialFile]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const currentView = viewStack[viewStack.length - 1];
 
   // Notify parent whenever the current view changes
   useEffect(() => {
     const moduleId = currentView.level === "component" ? null
       : currentView.module.id;
-    onViewChange(currentView.level, moduleId);
+    const file = currentView.level === "file" ? currentView.file : undefined;
+    onViewChange(currentView.level, moduleId, file);
   }, [currentView]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const pushView = useCallback((view: PanelView) => {
@@ -60,7 +74,7 @@ export function DetailPanel({ selection, repoUrl, commitSha, onClose, onViewChan
 
     function onMouseMove(e: MouseEvent) {
       if (!isResizing.current) return;
-      const delta = startX - e.clientX;
+      const delta = e.clientX - startX;
       setWidth(Math.max(300, Math.min(700, startWidth + delta)));
     }
 
@@ -76,12 +90,12 @@ export function DetailPanel({ selection, repoUrl, commitSha, onClose, onViewChan
 
   return (
     <div
-      className="shrink-0 bg-surface-1 border-l border-border flex flex-col h-full overflow-hidden relative"
+      className="absolute left-0 top-0 bottom-0 z-20 bg-surface-1/95 backdrop-blur-sm border-r border-border flex flex-col overflow-hidden animate-slide-in-left"
       style={{ width }}
     >
       {/* Resize handle */}
       <div
-        className="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-accent/30 active:bg-accent/50 z-10"
+        className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-accent/30 active:bg-accent/50 z-10"
         onMouseDown={onMouseDown}
       />
 
@@ -137,7 +151,7 @@ function PanelHeader({
   onClose: () => void;
 }) {
   const category = view.level === "component" ? view.category : view.module.category;
-  const colors = CATEGORY_COLORS[category];
+  const colors = getCategoryColors()[category];
 
   let title: string;
   if (view.level === "component") title = view.label;
@@ -159,7 +173,7 @@ function PanelHeader({
           {title}
         </h2>
         <span
-          className="text-[10px] px-1.5 py-0.5 rounded font-medium shrink-0"
+          className="text-xs px-1.5 py-0.5 rounded font-medium shrink-0"
           style={{
             background: colors.border + "22",
             color: colors.border,
@@ -192,8 +206,8 @@ function ComponentBody({
   const totalFiles = view.members.reduce((sum, m) => sum + m.files.length, 0);
 
   return (
-    <div className="flex-1 overflow-y-auto px-4 py-3 text-[13px] leading-relaxed">
-      <div className="text-[11px] text-text-tertiary mb-3">
+    <div className="flex-1 overflow-y-auto px-4 py-3 text-sm leading-relaxed">
+      <div className="text-[13px] text-text-tertiary mb-3">
         {view.members.length} module{view.members.length !== 1 ? "s" : ""}
         {totalFiles > 0 ? ` · ${totalFiles} files` : ""}
         {totalLines > 0 ? ` · ${totalLines.toLocaleString()} lines` : ""}
@@ -208,12 +222,12 @@ function ComponentBody({
             className="w-full text-left rounded-lg px-3 py-2.5 cursor-pointer transition-colors hover:bg-surface-2 group border border-border/50 hover:border-border"
           >
             <div className="flex items-center justify-between gap-2">
-              <span className="text-xs font-semibold text-foreground truncate">
+              <span className="text-sm font-semibold text-foreground truncate">
                 {mod.name}
               </span>
               <ChevronRight size={14} className="shrink-0 text-text-tertiary group-hover:text-accent transition-colors" />
             </div>
-            <p className="text-[11px] text-text-secondary mt-0.5 line-clamp-2">
+            <p className="text-[13px] text-foreground/80 mt-0.5 line-clamp-2">
               {mod.responsibility}
             </p>
             {mod.keyTypes.length > 0 && (
@@ -221,19 +235,19 @@ function ComponentBody({
                 {mod.keyTypes.slice(0, 3).map((t) => (
                   <span
                     key={t}
-                    className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-surface-2 text-accent"
+                    className="text-[13px] font-mono px-1.5 py-0.5 rounded bg-surface-2 text-accent"
                   >
                     {t}
                   </span>
                 ))}
                 {mod.keyTypes.length > 3 && (
-                  <span className="text-[9px] text-text-tertiary">
+                  <span className="text-[13px] text-text-tertiary">
                     +{mod.keyTypes.length - 3}
                   </span>
                 )}
               </div>
             )}
-            <div className="text-[10px] text-text-tertiary mt-1">
+            <div className="text-xs text-text-tertiary mt-1">
               {mod.files.length} file{mod.files.length !== 1 ? "s" : ""}
               {mod.lineCount ? ` · ${mod.lineCount.toLocaleString()} lines` : ""}
             </div>
@@ -257,6 +271,8 @@ function ModuleBody({
   commitSha: string;
   onSelectFile: (file: string) => void;
 }) {
+  const { theme } = useTheme();
+  const shikiTheme = theme === "light" ? "github-light-default" : "github-dark-default";
   const [activeFile, setActiveFile] = useState<string | null>(
     mod.files.length > 0 ? mod.files[0] : null
   );
@@ -317,17 +333,17 @@ function ModuleBody({
       try {
         const { codeToHtml } = await import("shiki");
         const lang = inferShikiLang(activeFile);
-        const html = await codeToHtml(sourceCode, { lang, theme: "vitesse-dark" });
+        const html = await codeToHtml(sourceCode, { lang, theme: shikiTheme });
         if (!cancelled) setHighlightedHtml(html);
       } catch {
         if (!cancelled) setHighlightedHtml(null);
       }
     })();
     return () => { cancelled = true; };
-  }, [sourceCode, activeFile]);
+  }, [sourceCode, activeFile, shikiTheme]);
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden px-4 py-3 text-[13px] leading-relaxed">
+    <div className="flex-1 flex flex-col overflow-hidden px-4 py-3 text-sm leading-relaxed">
       {/* Responsibility */}
       <p className="text-text-secondary mb-4 shrink-0">{mod.responsibility}</p>
 
@@ -341,7 +357,7 @@ function ModuleBody({
                 key={f}
                 onClick={() => setActiveFile(f)}
                 onDoubleClick={() => onSelectFile(f)}
-                className={`flex items-center justify-between gap-2 text-[11px] font-mono w-full px-1.5 py-1 rounded transition-colors cursor-pointer group ${
+                className={`flex items-center justify-between gap-2 text-[13px] font-mono w-full px-1.5 py-1 rounded transition-colors cursor-pointer group ${
                   activeFile === f
                     ? "bg-accent/15 text-accent"
                     : "text-text-tertiary hover:text-text-secondary hover:bg-surface-2"
@@ -353,7 +369,7 @@ function ModuleBody({
             ))}
           </div>
           {mod.lineCount != null && mod.lineCount > 0 && (
-            <p className="text-[11px] text-text-tertiary mt-1">
+            <p className="text-[13px] text-text-tertiary mt-1">
               {mod.lineCount.toLocaleString()} lines total
             </p>
           )}
@@ -395,7 +411,7 @@ function ModuleBody({
       <SectionTitle>Source Preview</SectionTitle>
       <div className="rounded-lg overflow-hidden border border-border flex flex-col flex-1 min-h-0">
         {activeFile && (
-          <div className="bg-surface-2 px-3 py-1.5 text-[10px] font-mono text-text-tertiary border-b border-border shrink-0 flex items-center gap-1.5">
+          <div className="bg-surface-2 px-3 py-1.5 text-xs font-mono text-text-tertiary border-b border-border shrink-0 flex items-center gap-1.5">
             <span className="truncate flex-1">{activeFile}</span>
             {(sourceCode || highlightedHtml) && (
               <button
@@ -408,11 +424,11 @@ function ModuleBody({
             )}
           </div>
         )}
-        <div className="flex-1 overflow-auto subtle-scrollbar text-[11px] leading-relaxed">
+        <div className="flex-1 overflow-auto subtle-scrollbar text-sm leading-relaxed">
           {loadingSource ? (
-            <div className="p-3 text-text-tertiary text-[11px]">Loading source...</div>
+            <div className="p-3 text-text-tertiary text-[13px]">Loading source...</div>
           ) : sourceError ? (
-            <div className="p-3 text-text-tertiary text-[11px] italic">{sourceError}</div>
+            <div className="p-3 text-text-tertiary text-[13px] italic">{sourceError}</div>
           ) : highlightedHtml ? (
             <div
               className="shiki-container"
@@ -423,7 +439,7 @@ function ModuleBody({
               {sourceCode}
             </pre>
           ) : (
-            <div className="p-3 text-text-tertiary text-[11px] italic">
+            <div className="p-3 text-text-tertiary text-[13px] italic">
               {mod.files.length === 0 ? "No files associated with this module" : "Select a file to preview"}
             </div>
           )}
@@ -454,6 +470,8 @@ function FileBody({
   repoUrl: string;
   commitSha: string;
 }) {
+  const { theme } = useTheme();
+  const shikiTheme = theme === "light" ? "github-light-default" : "github-dark-default";
   const [sourceCode, setSourceCode] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -504,19 +522,19 @@ function FileBody({
       try {
         const { codeToHtml } = await import("shiki");
         const lang = inferShikiLang(file);
-        const html = await codeToHtml(sourceCode, { lang, theme: "vitesse-dark" });
+        const html = await codeToHtml(sourceCode, { lang, theme: shikiTheme });
         if (!cancelled) setHighlightedHtml(html);
       } catch {
         if (!cancelled) setHighlightedHtml(null);
       }
     })();
     return () => { cancelled = true; };
-  }, [sourceCode, file]);
+  }, [sourceCode, file, shikiTheme]);
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
       {/* File path bar */}
-      <div className="bg-surface-2 px-3 py-1.5 text-[10px] font-mono text-text-tertiary border-b border-border shrink-0 flex items-center gap-1.5">
+      <div className="bg-surface-2 px-3 py-1.5 text-xs font-mono text-text-tertiary border-b border-border shrink-0 flex items-center gap-1.5">
         <span className="truncate">{file}</span>
         <button
           onClick={() => {
@@ -534,14 +552,14 @@ function FileBody({
       {/* Code */}
       {loading ? (
         <div className="flex-1 flex items-center justify-center">
-          <p className="text-[11px] text-text-tertiary">Loading source...</p>
+          <p className="text-[13px] text-text-tertiary">Loading source...</p>
         </div>
       ) : error ? (
         <div className="flex-1 flex items-center justify-center">
-          <p className="text-[11px] text-text-tertiary italic">{error}</p>
+          <p className="text-[13px] text-text-tertiary italic">{error}</p>
         </div>
       ) : sourceCode ? (
-        <div className="flex-1 overflow-auto subtle-scrollbar text-[11px] leading-relaxed">
+        <div className="flex-1 overflow-auto subtle-scrollbar text-sm leading-relaxed">
           {highlightedHtml ? (
             <div
               className="shiki-container"
@@ -599,7 +617,7 @@ function CodeLightbox({
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-2.5 bg-surface-2 border-b border-border shrink-0">
           <div className="flex items-center gap-2 min-w-0">
-            <span className="text-[11px] font-mono text-text-tertiary truncate">{file}</span>
+            <span className="text-[13px] font-mono text-text-tertiary truncate">{file}</span>
             <button
               onClick={() => {
                 navigator.clipboard.writeText(file);
@@ -642,7 +660,7 @@ function CodeLightbox({
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
-    <h3 className="text-[10px] font-medium uppercase tracking-wider text-text-tertiary mb-1.5 shrink-0">
+    <h3 className="text-xs font-medium uppercase tracking-wider text-text-tertiary mb-1.5 shrink-0">
       {children}
     </h3>
   );

@@ -8,6 +8,7 @@ interface DetailSliderProps {
   locked: boolean;
   onLevelChange: (level: ZoomLevel) => void;
   onLockedChange: (locked: boolean) => void;
+  position?: "bottom-left" | "bottom-right";
 }
 
 const LEVELS: { key: ZoomLevel; label: string; short: string }[] = [
@@ -16,11 +17,11 @@ const LEVELS: { key: ZoomLevel; label: string; short: string }[] = [
   { key: "detailed", label: "Detail", short: "Methods & types" },
 ];
 
-export function DetailSlider({ level, locked, onLevelChange, onLockedChange }: DetailSliderProps) {
+export function DetailSlider({ level, locked, onLevelChange, onLockedChange, position = "bottom-right" }: DetailSliderProps) {
   const activeIndex = LEVELS.findIndex((l) => l.key === level);
 
   return (
-    <div className="absolute bottom-4 right-4 z-10 flex flex-col items-center gap-1.5">
+    <div className={`absolute bottom-4 ${position === "bottom-left" ? "left-4" : "right-4"} z-10 flex flex-col items-center gap-1.5 animate-slider-enter`}>
       {/* Lock toggle */}
       <button
         onClick={() => onLockedChange(!locked)}
@@ -55,7 +56,7 @@ export function DetailSlider({ level, locked, onLevelChange, onLockedChange }: D
                 i === activeIndex ? "bg-accent" : "bg-text-tertiary/25"
               }`}
             />
-            <div className="absolute right-full mr-2 hidden group-hover:flex items-center whitespace-nowrap pointer-events-none">
+            <div className={`absolute ${position === "bottom-left" ? "left-full ml-2" : "right-full mr-2"} hidden group-hover:flex items-center whitespace-nowrap pointer-events-none`}>
               <span className="text-[10px] text-text-secondary bg-surface-1 border border-border rounded px-2 py-1 shadow-lg">
                 {l.label}
                 <span className="text-text-tertiary"> — {l.short}</span>

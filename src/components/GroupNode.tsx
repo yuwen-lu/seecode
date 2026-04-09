@@ -3,7 +3,7 @@
 import { memo } from "react";
 import { Handle, Position } from "@xyflow/react";
 import type { ArchModule, NodeCategory } from "@/types/graph";
-import { CATEGORY_COLORS, CATEGORY_LABELS } from "@/types/graph";
+import { getCategoryColors, CATEGORY_LABELS } from "@/types/graph";
 
 export interface GroupNodeData {
   [key: string]: unknown;
@@ -14,6 +14,8 @@ export interface GroupNodeData {
   members: ArchModule[];
   totalLines: number;
   dimmed?: boolean;
+  highlighted?: boolean;
+  isDark?: boolean;
 }
 
 export const GroupNode = memo(function GroupNode({
@@ -23,59 +25,40 @@ export const GroupNode = memo(function GroupNode({
   data: GroupNodeData;
   selected?: boolean;
 }) {
-  const colors = CATEGORY_COLORS[data.category];
+  const colors = getCategoryColors(data.isDark)[data.category];
 
   return (
     <>
       <Handle type="target" position={Position.Top} className="!bg-transparent !border-0 !w-3 !h-3" />
       <div
-        className="rounded-xl px-4 py-3 min-w-[200px] max-w-[300px]"
+        className={`rounded-xl px-4 py-3 bg-surface-1 border border-border${data.highlighted ? " node-chat-highlight" : ""}`}
         style={{
-          background: colors.bg,
-          boxShadow: `0 1px 4px rgba(0,0,0,0.35), inset 0 1px 0 ${colors.border}44`,
-          opacity: data.dimmed ? 0.25 : 1,
+          width: 280,
+          opacity: data.dimmed ? 0.5 : 1,
         }}
       >
-        {/* Category + group name */}
-        <span
-          className="text-[10px] font-medium uppercase tracking-wide block mb-0.5"
-          style={{ color: `${colors.border}cc` }}
-        >
-          {CATEGORY_LABELS[data.category]}
-        </span>
-        <div
-          className="text-sm font-bold leading-snug mb-1"
-          style={{ color: colors.text }}
-        >
+        {/* Category accent + group name */}
+        <div className="flex items-center gap-1.5 mb-0.5">
+          <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: colors.border }} />
+          <span className="text-[10px] font-medium uppercase tracking-wide" style={{ color: colors.border }}>
+            {CATEGORY_LABELS[data.category]}
+          </span>
+        </div>
+        <div className="text-sm font-bold leading-snug mb-1.5 text-foreground">
           {data.label}
         </div>
 
-        {/* Description */}
-        <p
-          className="text-[10px] leading-snug mb-2"
-          style={{ color: `${colors.text}88` }}
-        >
-          {data.description}
-        </p>
-
-        {/* Member names */}
-        <div
-          className="text-[9px] flex flex-wrap gap-x-2 gap-y-0.5"
-          style={{ color: `${colors.text}66` }}
-        >
-          {data.members.slice(0, 5).map((m) => (
-            <span key={m.id}>{m.name}</span>
+        {/* Member list */}
+        <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 mb-2">
+          {data.members.map((m) => (
+            <span key={m.id} className="text-[10px] leading-snug truncate text-text-secondary">
+              {m.name}
+            </span>
           ))}
-          {data.members.length > 5 && (
-            <span>+{data.members.length - 5} more</span>
-          )}
         </div>
 
         {/* Stats */}
-        <div
-          className="text-[9px] mt-2 pt-1.5"
-          style={{ color: `${colors.text}44`, borderTop: `1px solid ${colors.border}22` }}
-        >
+        <div className="text-[9px] pt-1.5 text-text-tertiary border-t border-border">
           {data.memberCount} module{data.memberCount !== 1 ? "s" : ""}
           {data.totalLines > 0 ? ` · ${data.totalLines.toLocaleString()} lines` : ""}
         </div>

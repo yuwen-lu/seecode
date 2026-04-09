@@ -41,10 +41,10 @@ function makeEdgeStyle(edge: ArchEdge) {
   return {
     stroke:
       edge.type === "weak"
-        ? "#2a2a40"
+        ? "var(--edge-weak)"
         : edge.type === "dataflow"
-        ? "#4a6a9f"
-        : "#3a3a55",
+        ? "var(--edge-dataflow)"
+        : "var(--edge-default)",
     strokeWidth: edge.type === "dataflow" ? 2 : 1.2,
     strokeDasharray: edge.type === "weak" ? "6 3" : undefined,
   };
@@ -138,8 +138,8 @@ export function buildHybridGraph(
       type: "default",
       animated: edge.type === "dataflow",
       style: makeEdgeStyle(edge),
-      labelStyle: { fill: "#555", fontSize: 9, fontWeight: 400 },
-      labelBgStyle: { fill: "#0a0a0f", fillOpacity: 0.85 },
+      labelStyle: { fill: "var(--edge-label)", fontSize: 9, fontWeight: 400 },
+      labelBgStyle: { fill: "var(--edge-label-bg)", fillOpacity: 0.85 },
       labelBgPadding: [4, 2] as [number, number],
       labelBgBorderRadius: 3,
     });
