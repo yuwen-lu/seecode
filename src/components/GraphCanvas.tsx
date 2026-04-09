@@ -414,9 +414,18 @@ function GraphCanvasInner({
       <ReactFlow
         className={animClass || undefined}
         nodes={nodes.map((n) => {
+          // Match by exact ID, group membership, or category when a group was expanded
+          const selectedCategory = selectedNodeId?.startsWith("group-")
+            ? selectedNodeId.slice(6) as NodeCategory
+            : null;
           const isSelected = n.id === selectedNodeId ||
+            // Group node containing the selected module
             (n.type === "groupNode" && selectedNodeId
               ? ((n.data as { members?: ArchModule[] })?.members ?? []).some((m) => m.id === selectedNodeId)
+              : false) ||
+            // Individual node belonging to the selected group's category
+            (selectedCategory && n.type !== "groupNode"
+              ? graph.modules.find((m) => m.id === n.id)?.category === selectedCategory
               : false);
           const dimmedBySelection = !!selectedNodeId && !isSelected;
           const dimmedByTrace = !!traceNodeIds && !traceNodeIds.has(n.id);

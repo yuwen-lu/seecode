@@ -69,7 +69,10 @@ export default function Home() {
   const handleSelect = useCallback((sel: PanelSelection | null) => {
     setSelection(sel);
     setHighlightOverride(null);
-    setPanelExpandedCategory(null);
+    // Only reset expansion when closing the panel, not when switching between nodes
+    if (!sel) {
+      setPanelExpandedCategory(null);
+    }
   }, []);
 
   function loadGraph(g: ArchGraph) {
