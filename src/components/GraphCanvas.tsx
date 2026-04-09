@@ -75,7 +75,7 @@ function GraphCanvasInner({
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
 
   const clickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [animClass, setAnimClass] = useState<"" | "react-flow--seeding" | "react-flow--morphing" | "react-flow--animating">("");
+  const [animClass, setAnimClass] = useState<"" | "react-flow--seeding" | "react-flow--morphing" | "react-flow--animating" | "react-flow--entering">("react-flow--entering");
   const animTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fitViewTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -192,9 +192,15 @@ function GraphCanvasInner({
   useEffect(() => {
     if (isInitialRender.current) {
       isInitialRender.current = false;
+
       setNodes(layout.nodes);
       setEdges(layout.edges);
       setTimeout(() => fitView({ padding: 0.12, duration: 300 }), 100);
+
+      // Clear entering class after entrance animations finish
+      if (animTimer.current) clearTimeout(animTimer.current);
+      animTimer.current = setTimeout(() => setAnimClass(""), 1200);
+
       // Store initial positions
       for (const n of layout.nodes) {
         prevNodePositions.current.set(n.id, { ...n.position });

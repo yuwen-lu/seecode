@@ -9,37 +9,37 @@
   --surface-2: #f0f0f0;
   --border: #e5e5e5;
   --border-strong: #d4d4d4;
-  --text-secondary: #666;
-  --text-tertiary: #999;
-  --accent: #4a7af5;
+  --text-secondary: #3d3d3d;
+  --text-tertiary: #636366;
+  --accent: #e07a3a;
   --grid-dot: #d4d4d4;
   --edge-default: #c0c0c0;
   --edge-weak: #d4d4d4;
-  --edge-dataflow: #6b8fc4;
+  --edge-dataflow: #b08968;
   --edge-label: #888;
   --edge-label-bg: #fafafa;
   --scrollbar: rgba(0, 0, 0, 0.1);
   --scrollbar-hover: rgba(0, 0, 0, 0.2);
-  --node-shadow: rgba(0, 0, 0, 0.08);
+  --node-shadow: none;
 }
 
 /* ─── Dark mode ─── */
 .dark {
-  --background: #0a0a0f;
-  --foreground: #e0e0e8;
-  --surface-1: #101018;
-  --surface-2: #16162a;
-  --border: #1e1e2e;
-  --border-strong: #2a2a3a;
-  --text-secondary: #888;
-  --text-tertiary: #555;
-  --accent: #7aa2f7;
-  --grid-dot: #1a1a2a;
-  --edge-default: #3a3a55;
-  --edge-weak: #2a2a40;
-  --edge-dataflow: #4a6a9f;
+  --background: #0c0c0e;
+  --foreground: #e2e2e6;
+  --surface-1: #131315;
+  --surface-2: #1a1a1e;
+  --border: #232326;
+  --border-strong: #2e2e32;
+  --text-secondary: #bbbbc4;
+  --text-tertiary: #9a9aa6;
+  --accent: #e8945a;
+  --grid-dot: #1e1e22;
+  --edge-default: #3a3a42;
+  --edge-weak: #2a2a30;
+  --edge-dataflow: #8a7060;
   --edge-label: #555;
-  --edge-label-bg: #0a0a0f;
+  --edge-label-bg: #0c0c0e;
   --scrollbar: rgba(255, 255, 255, 0.12);
   --scrollbar-hover: rgba(255, 255, 255, 0.25);
   --node-shadow: rgba(0, 0, 0, 0.3);
@@ -62,9 +62,9 @@
   --color-cat-core: #3b82f6;
   --color-cat-voice: #22c55e;
   --color-cat-visual: #a855f7;
-  --color-cat-ai: #f59e0b;
+  --color-cat-ai: #e8945a;
   --color-cat-proxy: #06b6d4;
-  --color-cat-external: #ef4444;
+  --color-cat-external: #f472b6;
   --color-cat-utility: #64748b;
   --color-cat-data: #ec4899;
   --color-cat-config: #8b5cf6;
@@ -80,10 +80,33 @@ body {
   background: var(--background) !important;
 }
 
+/* ─── Initial entrance animation ─── */
+.react-flow--entering .react-flow__edge {
+  animation: edge-enter 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: 300ms;
+}
+
+@keyframes edge-enter {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.react-flow--entering .react-flow__background {
+  animation: grid-enter 0.8s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes grid-enter {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
 /* Smooth node transitions */
 .react-flow__node {
   transition: opacity 0.3s ease;
   cursor: pointer !important;
+}
+.react-flow__node > div {
+  transition: opacity 0.2s ease;
 }
 .react-flow__node:hover > div {
   opacity: 1 !important;
@@ -116,6 +139,21 @@ body {
 @keyframes edge-fade-in {
   from { opacity: 0; }
   to { opacity: 1; }
+}
+
+/* Detail slider entrance */
+@keyframes slider-enter {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-slider-enter {
+  animation: slider-enter 0.4s cubic-bezier(0.22, 1, 0.36, 1) 0.3s both;
 }
 
 /* Edge labels */
@@ -157,7 +195,7 @@ body {
 
 /* Detail panel slide-in */
 @keyframes slide-in-left {
-  from { transform: translateX(-100%); opacity: 0; }
+  from { transform: translateX(-20%); opacity: 0.5; }
   to { transform: translateX(0); opacity: 1; }
 }
 .animate-slide-in-left {
@@ -181,3 +219,13 @@ body {
 /* Hide scrollbar */
 .hide-scrollbar::-webkit-scrollbar { display: none; }
 .hide-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .react-flow--entering .react-flow__edge,
+  .react-flow--entering .react-flow__background,
+  .animate-slider-enter {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+  }
+}

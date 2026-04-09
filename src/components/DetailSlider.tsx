@@ -21,7 +21,7 @@ export function DetailSlider({ level, locked, onLevelChange, onLockedChange, pos
   const activeIndex = LEVELS.findIndex((l) => l.key === level);
 
   return (
-    <div className={`absolute bottom-4 ${position === "bottom-left" ? "left-4" : "right-4"} z-10 flex flex-col items-center gap-1.5`}>
+    <div className={`absolute bottom-4 ${position === "bottom-left" ? "left-4" : "right-4"} z-10 flex flex-col items-center gap-1.5 animate-slider-enter`}>
       {/* Lock toggle */}
       <button
         onClick={() => onLockedChange(!locked)}
