@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Copy, Check, ChevronRight, ChevronLeft, Maximize2, X } from "lucide-react";
 import type { ArchModule, PanelSelection, NodeCategory } from "@/types/graph";
-import { CATEGORY_COLORS, CATEGORY_LABELS, githubRawUrl } from "@/types/graph";
+import { getCategoryColors, CATEGORY_LABELS, githubRawUrl } from "@/types/graph";
 
 type PanelView =
   | { level: "component"; category: NodeCategory; label: string; members: ArchModule[] }
@@ -150,7 +150,7 @@ function PanelHeader({
   onClose: () => void;
 }) {
   const category = view.level === "component" ? view.category : view.module.category;
-  const colors = CATEGORY_COLORS[category];
+  const colors = getCategoryColors()[category];
 
   let title: string;
   if (view.level === "component") title = view.label;

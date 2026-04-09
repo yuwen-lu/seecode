@@ -3,7 +3,7 @@
 import { memo } from "react";
 import { Handle, Position } from "@xyflow/react";
 import type { ArchModule, NodeCategory } from "@/types/graph";
-import { CATEGORY_COLORS, CATEGORY_LABELS } from "@/types/graph";
+import { getCategoryColors, CATEGORY_LABELS } from "@/types/graph";
 
 export interface GroupNodeData {
   [key: string]: unknown;
@@ -15,6 +15,7 @@ export interface GroupNodeData {
   totalLines: number;
   dimmed?: boolean;
   highlighted?: boolean;
+  isDark?: boolean;
 }
 
 export const GroupNode = memo(function GroupNode({
@@ -24,7 +25,7 @@ export const GroupNode = memo(function GroupNode({
   data: GroupNodeData;
   selected?: boolean;
 }) {
-  const colors = CATEGORY_COLORS[data.category];
+  const colors = getCategoryColors(data.isDark)[data.category];
 
   return (
     <>

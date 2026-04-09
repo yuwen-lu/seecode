@@ -23,6 +23,7 @@ import {
   buildHybridGraph,
   type ZoomLevel,
 } from "@/lib/semantic-zoom";
+import { useTheme } from "next-themes";
 
 interface GraphCanvasProps {
   graph: ArchGraph;
@@ -49,6 +50,8 @@ function GraphCanvasInner({
   chatHighlights,
 }: GraphCanvasProps) {
   const { fitView } = useReactFlow();
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
   const [zoomLevel, setZoomLevel] = useState<ZoomLevel>("collapsed");
   const [locked, setLocked] = useState(true); // Default locked since we use double-click now
   const prevZoomLevel = useRef<ZoomLevel>("collapsed");
@@ -301,7 +304,7 @@ function GraphCanvasInner({
           animated: isOnTrace,
           style: {
             ...edge.style,
-            stroke: isOnTrace ? "#7aa2f7" : (edge.style?.stroke ?? "#5a6080"),
+            stroke: isOnTrace ? "var(--accent)" : (edge.style?.stroke ?? "var(--edge-default)"),
             strokeWidth: isOnTrace ? 3 : (Number(edge.style?.strokeWidth) || 1.5),
             opacity: isOnTrace ? 1 : 0.3,
           },
@@ -438,6 +441,7 @@ function GraphCanvasInner({
               dimmed: dimmedBySelection || dimmedByTrace,
               // Individual nodes always show at least compact; group nodes stay collapsed
               zoomLevel: n.type === "groupNode" ? zoomLevel : (zoomLevel === "collapsed" ? "compact" : zoomLevel),
+              isDark,
               highlighted: chatHighlights?.has(n.id) ||
                 (n.type === "groupNode" && chatHighlights
                   ? ((n.data as { members?: ArchModule[] })?.members ?? []).some((m) => chatHighlights.has(m.id))
@@ -485,7 +489,7 @@ function GraphCanvasInner({
         panOnScroll
         proOptions={{ hideAttribution: true }}
       >
-        <Background color="#1a1a2a" gap={20} size={1} />
+        <Background color="var(--grid-dot)" gap={20} size={1} />
       </ReactFlow>
 
       <DetailSlider

@@ -1,6 +1,7 @@
 "use client";
 
 import type { DataTrace } from "@/types/graph";
+import { ThemeToggle } from "./ThemeToggle";
 
 export type RenderMode = "reactflow" | "mermaid";
 
@@ -36,6 +37,8 @@ export function Header({
         <span className="text-sm font-semibold text-foreground tracking-tight">
           SeeCode
         </span>
+        <div className="flex-1" />
+        <ThemeToggle />
       </header>
     );
   }
@@ -81,6 +84,8 @@ export function Header({
             {renderMode === "reactflow" ? "Mermaid" : "Graph"}
           </button>
         )}
+
+        <ThemeToggle />
       </div>
     </header>
   );

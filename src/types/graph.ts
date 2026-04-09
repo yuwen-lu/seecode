@@ -51,8 +51,8 @@ export type PanelSelection =
   | { kind: 'component'; category: NodeCategory; label: string; members: ArchModule[] }
   | { kind: 'module'; module: ArchModule };
 
-/** Category → color mapping */
-export const CATEGORY_COLORS: Record<NodeCategory, { bg: string; border: string; text: string }> = {
+/** Category → color mapping per theme */
+const COLORS_DARK: Record<NodeCategory, { bg: string; border: string; text: string }> = {
   core:       { bg: '#1a2744', border: '#3b82f6', text: '#bfdbfe' },
   voice:      { bg: '#14332a', border: '#22c55e', text: '#bbf7d0' },
   visual:     { bg: '#2a1a3f', border: '#a855f7', text: '#e9d5ff' },
@@ -63,6 +63,26 @@ export const CATEGORY_COLORS: Record<NodeCategory, { bg: string; border: string;
   data:       { bg: '#33142a', border: '#ec4899', text: '#fce7f3' },
   config:     { bg: '#231a3f', border: '#8b5cf6', text: '#ddd6fe' },
 };
+
+const COLORS_LIGHT: Record<NodeCategory, { bg: string; border: string; text: string }> = {
+  core:       { bg: '#eff6ff', border: '#3b82f6', text: '#1e40af' },
+  voice:      { bg: '#f0fdf4', border: '#22c55e', text: '#166534' },
+  visual:     { bg: '#faf5ff', border: '#a855f7', text: '#6b21a8' },
+  'api-client': { bg: '#fffbeb', border: '#f59e0b', text: '#92400e' },
+  proxy:      { bg: '#ecfeff', border: '#06b6d4', text: '#155e75' },
+  external:   { bg: '#fef2f2', border: '#ef4444', text: '#991b1b' },
+  utility:    { bg: '#f8fafc', border: '#64748b', text: '#334155' },
+  data:       { bg: '#fdf2f8', border: '#ec4899', text: '#9d174d' },
+  config:     { bg: '#f5f3ff', border: '#8b5cf6', text: '#5b21b6' },
+};
+
+export function getCategoryColors(isDark?: boolean): Record<NodeCategory, { bg: string; border: string; text: string }> {
+  const dark = isDark ?? (typeof document !== "undefined" && document.documentElement.classList.contains("dark"));
+  return dark ? COLORS_DARK : COLORS_LIGHT;
+}
+
+/** @deprecated Use getCategoryColors() for theme-aware colors */
+export const CATEGORY_COLORS = COLORS_DARK;
 
 /** Build a raw GitHub URL for fetching file contents */
 export function githubRawUrl(repoUrl: string, commitSha: string, filePath: string): string {

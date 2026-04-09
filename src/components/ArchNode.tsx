@@ -3,7 +3,7 @@
 import { memo } from "react";
 import { Handle, Position } from "@xyflow/react";
 import type { ArchModule } from "@/types/graph";
-import { CATEGORY_COLORS, CATEGORY_LABELS } from "@/types/graph";
+import { getCategoryColors, CATEGORY_LABELS } from "@/types/graph";
 import type { ZoomLevel } from "@/lib/semantic-zoom";
 
 interface ArchNodeData {
@@ -11,6 +11,7 @@ interface ArchNodeData {
   dimmed?: boolean;
   zoomLevel?: ZoomLevel;
   highlighted?: boolean;
+  isDark?: boolean;
 }
 
 export const ArchNode = memo(function ArchNode({
@@ -19,8 +20,8 @@ export const ArchNode = memo(function ArchNode({
   data: ArchNodeData;
   selected?: boolean;
 }) {
-  const { module: mod, dimmed, zoomLevel, highlighted } = data;
-  const colors = CATEGORY_COLORS[mod.category];
+  const { module: mod, dimmed, zoomLevel, highlighted, isDark } = data;
+  const colors = getCategoryColors(isDark)[mod.category];
 
   // Use zoomLevel from slider when available (locked mode)
   const showDetail = zoomLevel === "detailed";
