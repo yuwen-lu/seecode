@@ -325,7 +325,7 @@ function GraphCanvasInner({
           return {
             ...n,
             selected: isSelected,
-            data: { ...n.data, dimmed: dimmedBySelection || dimmedByTrace },
+            data: { ...n.data, dimmed: dimmedBySelection || dimmedByTrace, zoomLevel },
           };
         })}
         edges={edges}
