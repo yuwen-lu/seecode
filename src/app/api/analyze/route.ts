@@ -1,7 +1,9 @@
 import { NextRequest } from "next/server";
-import { ingestRepo, cleanupRepo } from "@/lib/repo";
+import fs from "fs";
+import { parseGitHubUrl, cloneRepo, discoverFiles, detectPrimaryLanguage, cleanupRepo } from "@/lib/repo";
 import { extractAll } from "@/lib/extractors";
 import { analyzeWithLLMStreaming } from "@/lib/llm-analyzer";
+import { getCachedGraph, cacheGraph } from "@/lib/cache";
 import type { ArchGraph } from "@/types/graph";
 
 export const maxDuration = 120;
@@ -30,10 +32,24 @@ export async function POST(request: NextRequest) {
 
         // Step 1: Clone
         send("status", { step: "cloning", message: "Cloning repository..." });
-        const repoInfo = ingestRepo(url);
-        repoDir = repoInfo.repoDir;
+        const { owner, repo, cloneUrl } = parseGitHubUrl(url);
+        const repoName = `${owner}/${repo}`;
+        const cloneResult = cloneRepo(cloneUrl, repo);
+        repoDir = cloneResult.repoDir;
+        const commitSha = cloneResult.commitSha;
 
-        if (repoInfo.files.length === 0) {
+        // Step 2: Check cache
+        const cached = getCachedGraph(url, commitSha);
+        if (cached) {
+          send("status", { step: "cached", message: "Loaded from cache" });
+          send("result", cached);
+          return;
+        }
+
+        const files = discoverFiles(repoDir);
+        const primaryLanguage = detectPrimaryLanguage(files);
+
+        if (files.length === 0) {
           send("error", { error: "No source files found in this repository" });
           controller.close();
           return;
@@ -41,41 +57,61 @@ export async function POST(request: NextRequest) {
 
         send("status", {
           step: "cloned",
-          message: `Found ${repoInfo.files.length} source files (${repoInfo.primaryLanguage})`,
+          message: `Found ${files.length} source files (${primaryLanguage})`,
         });
 
-        // Step 2: Tree-sitter extraction
+        // Step 3: Tree-sitter extraction
         send("status", { step: "extracting", message: "Extracting code structure..." });
-        const extraction = extractAll(repoInfo.files);
+        const extraction = extractAll(files);
         send("status", {
           step: "extracted",
           message: `Parsed ${extraction.files.length} files, found ${extraction.dependencyEdges.length} dependencies`,
         });
 
-        // Step 3: LLM analysis (streaming)
+        // Step 4: LLM analysis (streaming)
         send("status", { step: "analyzing", message: "Analyzing architecture with Claude..." });
 
         const llmResult = await analyzeWithLLMStreaming(
           extraction,
-          repoInfo.files,
-          repoInfo.repoName,
+          files,
+          repoName,
           (chunk: string) => {
             send("chunk", { text: chunk });
           },
         );
 
-        // Step 4: Send final graph
+        // Step 5: Capture source snippets before cleanup
+        const sourceSnippets: Record<string, string> = {};
+        for (const mod of llmResult.modules) {
+          for (const filePath of mod.files) {
+            if (sourceSnippets[filePath]) continue;
+            const sf = files.find(
+              (f) => f.relativePath === filePath || f.relativePath.endsWith(filePath)
+            );
+            if (sf) {
+              try {
+                const content = fs.readFileSync(sf.absolutePath, "utf-8");
+                const lines = content.split("\n");
+                sourceSnippets[filePath] = lines.slice(0, 200).join("\n");
+              } catch { /* skip unreadable */ }
+            }
+          }
+        }
+
+        // Step 6: Build and cache the graph
         const graph: ArchGraph = {
           repoUrl: url,
-          repoName: repoInfo.repoName,
-          commitSha: repoInfo.commitSha,
+          repoName,
+          commitSha,
           analyzedAt: new Date().toISOString(),
           modules: llmResult.modules,
           edges: llmResult.edges,
           traces: llmResult.traces,
           mermaid: llmResult.mermaid,
+          sourceSnippets,
         };
 
+        cacheGraph(graph);
         send("result", graph);
       } catch (err) {
         const message = err instanceof Error ? err.message : "Internal server error";

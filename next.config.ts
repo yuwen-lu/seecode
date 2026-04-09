@@ -7,6 +7,7 @@ const nextConfig: NextConfig = {
     "tree-sitter-python",
     "tree-sitter-go",
     "tree-sitter-rust",
+    "better-sqlite3",
   ],
 };
 

@@ -44,7 +44,13 @@ export interface ArchGraph {
   edges: ArchEdge[];
   traces: DataTrace[];
   mermaid?: string; // Raw Mermaid source for debug view
+  sourceSnippets?: Record<string, string>; // file path → source content (first 200 lines)
 }
+
+/** Panel selection — either a component (group) or a specific module */
+export type PanelSelection =
+  | { kind: 'component'; category: NodeCategory; label: string; members: ArchModule[] }
+  | { kind: 'module'; module: ArchModule };
 
 /** Category → color mapping */
 export const CATEGORY_COLORS: Record<NodeCategory, { bg: string; border: string; text: string }> = {

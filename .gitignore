@@ -52,3 +52,8 @@ next-env.d.ts
 
 # screenshots from testing
 *.png
+
+# SQLite cache
+.seecode-cache.db
+.seecode-cache.db-wal
+.seecode-cache.db-shm
