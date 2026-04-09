@@ -1,5 +1,6 @@
 "use client";
 
+import { Lock, Unlock } from "lucide-react";
 import type { ZoomLevel } from "@/lib/semantic-zoom";
 
 interface DetailSliderProps {
@@ -23,22 +24,14 @@ export function DetailSlider({ level, locked, onLevelChange, onLockedChange }: D
       {/* Lock toggle */}
       <button
         onClick={() => onLockedChange(!locked)}
-        className={`w-7 h-7 flex items-center justify-center rounded-md border text-[11px] transition-colors ${
+        className={`w-7 h-7 flex items-center justify-center rounded-md border transition-colors cursor-pointer ${
           locked
-            ? "bg-accent/15 border-accent/40 text-accent"
+            ? "bg-accent/10 border-accent/30 text-accent"
             : "bg-surface-1 border-border text-text-tertiary hover:text-text-secondary"
         }`}
         title={locked ? "Unlock: zoom controls detail level" : "Lock: keep current detail level while zooming"}
       >
-        {locked ? (
-          <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
-            <path d="M11 6V4a3 3 0 0 0-6 0v2H4a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1h-1zm-4-2a1 1 0 1 1 2 0v2H7V4z"/>
-          </svg>
-        ) : (
-          <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
-            <path d="M11 6h1a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h1V4a3 3 0 0 1 5.12-2.12L8.7 3.3A1 1 0 0 0 7 4v2h4z"/>
-          </svg>
-        )}
+        {locked ? <Lock size={12} /> : <Unlock size={12} />}
       </button>
 
       {/* Vertical slider track */}
@@ -50,20 +43,19 @@ export function DetailSlider({ level, locked, onLevelChange, onLockedChange }: D
               onLevelChange(l.key);
               if (!locked) onLockedChange(true);
             }}
-            className={`group relative w-6 h-8 flex items-center justify-center rounded transition-colors ${
+            className={`group relative w-6 h-7 flex items-center justify-center rounded transition-colors cursor-pointer ${
               i === activeIndex
-                ? "bg-accent/20"
+                ? "bg-accent/15"
                 : "hover:bg-surface-2"
             }`}
             title={`${l.label}: ${l.short}`}
           >
-            {/* Dot indicator */}
             <div
-              className={`w-2 h-2 rounded-full transition-colors ${
-                i === activeIndex ? "bg-accent" : "bg-text-tertiary/30"
+              className={`w-1.5 h-1.5 rounded-full transition-colors ${
+                i === activeIndex ? "bg-accent" : "bg-text-tertiary/25"
               }`}
             />
-            {/* Tooltip on hover */}
+            {/* Tooltip */}
             <div className="absolute right-full mr-2 hidden group-hover:flex items-center whitespace-nowrap pointer-events-none">
               <span className="text-[10px] text-text-secondary bg-surface-1 border border-border rounded px-2 py-1 shadow-lg">
                 {l.label}
@@ -75,7 +67,7 @@ export function DetailSlider({ level, locked, onLevelChange, onLockedChange }: D
       </div>
 
       {/* Current level label */}
-      <span className="text-[9px] text-text-tertiary text-center leading-tight">
+      <span className="text-[9px] text-text-tertiary text-center leading-tight select-none">
         {LEVELS[activeIndex]?.label}
       </span>
     </div>

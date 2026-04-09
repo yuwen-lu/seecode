@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { Copy, Check, ChevronRight } from "lucide-react";
+import { Copy, Check, ChevronRight, X } from "lucide-react";
 import type { ArchModule, PanelSelection } from "@/types/graph";
 import { CATEGORY_COLORS, CATEGORY_LABELS } from "@/types/graph";
 
@@ -94,7 +94,6 @@ function ComponentView({
             style={{
               background: colors.border + "22",
               color: colors.border,
-              border: `1px solid ${colors.border}44`,
             }}
           >
             {CATEGORY_LABELS[selection.category]}
@@ -102,9 +101,9 @@ function ComponentView({
         </div>
         <button
           onClick={onClose}
-          className="text-text-secondary hover:text-foreground text-lg px-1 cursor-pointer"
+          className="text-text-tertiary hover:text-foreground p-1 rounded hover:bg-surface-2 transition-colors cursor-pointer"
         >
-          &times;
+          <X size={14} />
         </button>
       </div>
 
@@ -124,7 +123,7 @@ function ComponentView({
             <button
               key={mod.id}
               onClick={() => onDrillToModule(mod)}
-              className="w-full text-left rounded-lg px-3 py-2.5 cursor-pointer transition-colors hover:bg-surface-2 group border border-border/50 hover:border-border"
+              className="w-full text-left rounded-lg px-3 py-2.5 cursor-pointer transition-colors hover:bg-surface-2 group"
             >
               <div className="flex items-center justify-between gap-2">
                 <span className="text-xs font-semibold text-foreground truncate">
@@ -223,7 +222,6 @@ function ModuleView({
             style={{
               background: colors.border + "22",
               color: colors.border,
-              border: `1px solid ${colors.border}44`,
             }}
           >
             {CATEGORY_LABELS[mod.category]}
@@ -231,9 +229,9 @@ function ModuleView({
         </div>
         <button
           onClick={onClose}
-          className="text-text-secondary hover:text-foreground text-lg px-1 cursor-pointer"
+          className="text-text-tertiary hover:text-foreground p-1 rounded hover:bg-surface-2 transition-colors cursor-pointer"
         >
-          &times;
+          <X size={14} />
         </button>
       </div>
 
@@ -294,8 +292,8 @@ function ModuleView({
 
         <SectionTitle>Source Preview</SectionTitle>
         {sourceCode ? (
-          <div className="rounded-lg overflow-hidden border border-border flex flex-col flex-1 min-h-0">
-            <div className="bg-surface-2 px-3 py-1.5 text-[10px] font-mono text-text-tertiary border-b border-border shrink-0 flex items-center gap-1.5">
+          <div className="rounded-lg overflow-hidden bg-surface-1 flex flex-col flex-1 min-h-0">
+            <div className="bg-surface-2 px-3 py-1.5 text-[10px] font-mono text-text-tertiary shrink-0 flex items-center gap-1.5">
               <span className="truncate">{activeFile}</span>
               <button
                 onClick={() => {
@@ -340,7 +338,7 @@ function ModuleView({
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
-    <h3 className="text-[11px] font-semibold uppercase tracking-wider text-accent mt-4 mb-1.5 first:mt-0 shrink-0">
+    <h3 className="text-[10px] font-medium uppercase tracking-wider text-text-tertiary mt-4 mb-1.5 first:mt-0 shrink-0">
       {children}
     </h3>
   );

@@ -42,6 +42,11 @@ body {
   color: var(--foreground);
 }
 
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
 /* React Flow overrides for dark theme */
 .react-flow__background {
   background: var(--background) !important;

@@ -39,7 +39,7 @@ export function StreamingLoader({ status, streamedText, onStop }: StreamingLoade
       >
         <p className="font-mono text-[12px] leading-[1.7] text-text-tertiary/50 whitespace-pre-wrap break-words selection:bg-accent/20">
           {streamedText}
-          {streamedText && <span className="animate-pulse text-accent/60">|</span>}
+          {streamedText && <span className="animate-[blink_1s_steps(2)_infinite] text-accent/60">|</span>}
         </p>
       </div>
     </div>
