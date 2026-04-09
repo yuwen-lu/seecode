@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ReactFlow,
   Background,
-  Controls,
   useNodesState,
   useEdgesState,
   useReactFlow,
@@ -32,6 +31,7 @@ interface GraphCanvasProps {
   selectedNodeId: string | null;
   panelExpandedCategory?: NodeCategory | null;
   panelOpen?: boolean;
+  chatHighlights?: Set<string>;
 }
 
 const nodeTypes = {
@@ -46,6 +46,7 @@ function GraphCanvasInner({
   selectedNodeId,
   panelExpandedCategory,
   panelOpen,
+  chatHighlights,
 }: GraphCanvasProps) {
   const { fitView } = useReactFlow();
   const [zoomLevel, setZoomLevel] = useState<ZoomLevel>("collapsed");
@@ -158,30 +159,20 @@ function GraphCanvasInner({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [triggerAnimation, scheduleFitView, locked]);
 
-  // Sync canvas expansion with panel drill-down (expand/collapse single category)
+  // Panel drill-down requests category expansion (one-way: expand only, never collapse)
   const panelPrevCategory = useRef<NodeCategory | null>(null);
   useEffect(() => {
     const prev = panelPrevCategory.current;
     const next = panelExpandedCategory ?? null;
     panelPrevCategory.current = next;
 
-    if (next && next !== prev) {
-      if (!expandedCategories.has(next)) {
-        const updated = new Set(expandedCategories);
-        updated.add(next);
-        triggerAnimation();
-        pushExpansion(updated);
-        const memberIds = graph.modules.filter((m) => m.category === next).map((m) => m.id);
-        scheduleFitView(memberIds);
-      }
-    } else if (!next && prev) {
-      if (expandedCategories.has(prev)) {
-        const updated = new Set(expandedCategories);
-        updated.delete(prev);
-        triggerAnimation();
-        pushExpansion(updated);
-        scheduleFitView();
-      }
+    if (next && next !== prev && !expandedCategories.has(next)) {
+      const updated = new Set(expandedCategories);
+      updated.add(next);
+      triggerAnimation();
+      pushExpansion(updated);
+      const memberIds = graph.modules.filter((m) => m.category === next).map((m) => m.id);
+      scheduleFitView(memberIds);
     }
   }, [panelExpandedCategory]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -437,6 +428,10 @@ function GraphCanvasInner({
               dimmed: dimmedBySelection || dimmedByTrace,
               // Individual nodes always show at least compact; group nodes stay collapsed
               zoomLevel: n.type === "groupNode" ? zoomLevel : (zoomLevel === "collapsed" ? "compact" : zoomLevel),
+              highlighted: chatHighlights?.has(n.id) ||
+                (n.type === "groupNode" && chatHighlights
+                  ? ((n.data as { members?: ArchModule[] })?.members ?? []).some((m) => chatHighlights.has(m.id))
+                  : false),
             },
           };
         })}
@@ -473,17 +468,15 @@ function GraphCanvasInner({
         proOptions={{ hideAttribution: true }}
       >
         <Background color="#1a1a2a" gap={20} size={1} />
-        <Controls position="bottom-left" showInteractive={false} />
       </ReactFlow>
 
-      {!panelOpen && (
-        <DetailSlider
-          level={displayLevel}
-          locked={locked}
-          onLevelChange={handleLevelChange}
-          onLockedChange={setLocked}
-        />
-      )}
+      <DetailSlider
+        level={displayLevel}
+        locked={locked}
+        onLevelChange={handleLevelChange}
+        onLockedChange={setLocked}
+        position="bottom-left"
+      />
     </>
   );
 }

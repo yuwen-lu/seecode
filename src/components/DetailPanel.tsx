@@ -17,10 +17,11 @@ interface DetailPanelProps {
   repoUrl: string;
   commitSha: string;
   onClose: () => void;
-  onViewChange: (depth: PanelDepth, moduleId: string | null) => void;
+  onViewChange: (depth: PanelDepth, moduleId: string | null, file?: string) => void;
+  initialFile?: string | null;
 }
 
-export function DetailPanel({ selection, repoUrl, commitSha, onClose, onViewChange }: DetailPanelProps) {
+export function DetailPanel({ selection, repoUrl, commitSha, onClose, onViewChange, initialFile }: DetailPanelProps) {
   const [width, setWidth] = useState(400);
   const isResizing = useRef(false);
 
@@ -32,13 +33,25 @@ export function DetailPanel({ selection, repoUrl, commitSha, onClose, onViewChan
     setViewStack(selectionToView(selection));
   }, [selection]);
 
+  // Navigate to file when initialFile is set (from chat panel)
+  useEffect(() => {
+    if (!initialFile) return;
+    if (selection.kind === "module") {
+      const mod = selection.module;
+      if (mod.files.includes(initialFile)) {
+        setViewStack((prev) => [...prev, { level: "file", module: mod, file: initialFile }]);
+      }
+    }
+  }, [initialFile]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const currentView = viewStack[viewStack.length - 1];
 
   // Notify parent whenever the current view changes
   useEffect(() => {
     const moduleId = currentView.level === "component" ? null
       : currentView.module.id;
-    onViewChange(currentView.level, moduleId);
+    const file = currentView.level === "file" ? currentView.file : undefined;
+    onViewChange(currentView.level, moduleId, file);
   }, [currentView]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const pushView = useCallback((view: PanelView) => {
@@ -60,7 +73,7 @@ export function DetailPanel({ selection, repoUrl, commitSha, onClose, onViewChan
 
     function onMouseMove(e: MouseEvent) {
       if (!isResizing.current) return;
-      const delta = startX - e.clientX;
+      const delta = e.clientX - startX;
       setWidth(Math.max(300, Math.min(700, startWidth + delta)));
     }
 
@@ -76,12 +89,12 @@ export function DetailPanel({ selection, repoUrl, commitSha, onClose, onViewChan
 
   return (
     <div
-      className="shrink-0 bg-surface-1 border-l border-border flex flex-col h-full overflow-hidden relative"
+      className="shrink-0 bg-surface-1 border-r border-border flex flex-col h-full overflow-hidden relative"
       style={{ width }}
     >
       {/* Resize handle */}
       <div
-        className="absolute left-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-accent/30 active:bg-accent/50 z-10"
+        className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-accent/30 active:bg-accent/50 z-10"
         onMouseDown={onMouseDown}
       />
 

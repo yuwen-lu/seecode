@@ -14,6 +14,7 @@ export interface GroupNodeData {
   members: ArchModule[];
   totalLines: number;
   dimmed?: boolean;
+  highlighted?: boolean;
 }
 
 export const GroupNode = memo(function GroupNode({
@@ -29,8 +30,9 @@ export const GroupNode = memo(function GroupNode({
     <>
       <Handle type="target" position={Position.Top} className="!bg-transparent !border-0 !w-3 !h-3" />
       <div
-        className="rounded-xl px-4 py-3 min-w-[200px] max-w-[300px]"
+        className={`rounded-xl px-4 py-3${data.highlighted ? " node-chat-highlight" : ""}`}
         style={{
+          width: 280,
           background: colors.bg,
           boxShadow: `0 1px 4px rgba(0,0,0,0.35), inset 0 1px 0 ${colors.border}44`,
           opacity: data.dimmed ? 0.25 : 1,
@@ -50,26 +52,19 @@ export const GroupNode = memo(function GroupNode({
           {data.label}
         </div>
 
-        {/* Description */}
-        <p
-          className="text-[10px] leading-snug mb-2"
-          style={{ color: `${colors.text}88` }}
-        >
-          {data.description}
-        </p>
-
-        {/* Member names */}
-        <div
-          className="text-[9px] flex flex-wrap gap-x-2 gap-y-0.5"
-          style={{ color: `${colors.text}66` }}
-        >
-          {data.members.slice(0, 5).map((m) => (
-            <span key={m.id}>{m.name}</span>
+        {/* Member list */}
+        <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 mb-2">
+          {data.members.map((m) => (
+            <span
+              key={m.id}
+              className="text-[10px] leading-snug truncate"
+              style={{ color: `${colors.text}88` }}
+            >
+              {m.name}
+            </span>
           ))}
-          {data.members.length > 5 && (
-            <span>+{data.members.length - 5} more</span>
-          )}
         </div>
+
 
         {/* Stats */}
         <div

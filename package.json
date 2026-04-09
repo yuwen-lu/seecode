@@ -18,12 +18,14 @@
     "next": "16.2.3",
     "react": "19.2.4",
     "react-dom": "19.2.4",
+    "react-markdown": "^10.1.0",
     "shiki": "^4.0.2",
     "tree-sitter": "^0.25.0",
     "tree-sitter-go": "^0.25.0",
     "tree-sitter-python": "^0.25.0",
     "tree-sitter-rust": "^0.24.0",
-    "tree-sitter-typescript": "^0.23.2"
+    "tree-sitter-typescript": "^0.23.2",
+    "zustand": "^5.0.12"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

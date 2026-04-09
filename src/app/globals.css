@@ -173,6 +173,20 @@ body {
   background-color: rgba(255, 255, 255, 0.3);
 }
 
+/* Chat-referenced node highlight */
+.node-chat-highlight {
+  position: relative;
+}
+.node-chat-highlight::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  border: 1.5px solid var(--accent);
+  opacity: 0.5;
+  pointer-events: none;
+}
+
 /* Hide scrollbar completely */
 .hide-scrollbar::-webkit-scrollbar {
   display: none;

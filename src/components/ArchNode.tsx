@@ -10,6 +10,7 @@ interface ArchNodeData {
   module: ArchModule;
   dimmed?: boolean;
   zoomLevel?: ZoomLevel;
+  highlighted?: boolean;
 }
 
 export const ArchNode = memo(function ArchNode({
@@ -18,7 +19,7 @@ export const ArchNode = memo(function ArchNode({
   data: ArchNodeData;
   selected?: boolean;
 }) {
-  const { module: mod, dimmed, zoomLevel } = data;
+  const { module: mod, dimmed, zoomLevel, highlighted } = data;
   const colors = CATEGORY_COLORS[mod.category];
 
   // Use zoomLevel from slider when available (locked mode)
@@ -29,8 +30,9 @@ export const ArchNode = memo(function ArchNode({
     <>
       <Handle type="target" position={Position.Top} className="!bg-transparent !border-0 !w-2 !h-2" />
       <div
-        className="rounded-lg px-3 py-2 min-w-[180px] max-w-[260px]"
+        className={`rounded-lg px-3 py-2${highlighted ? " node-chat-highlight" : ""}`}
         style={{
+          width: 260,
           background: colors.bg,
           boxShadow: `0 1px 3px rgba(0,0,0,0.3), inset 0 1px 0 ${colors.border}44`,
           opacity: dimmed ? 0.25 : 1,
