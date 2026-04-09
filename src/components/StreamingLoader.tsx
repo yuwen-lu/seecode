@@ -35,7 +35,7 @@ export function StreamingLoader({ status, streamedText, onStop }: StreamingLoade
       {/* Streaming text — fullscreen, semi-transparent, mono, no scrollbar */}
       <div
         ref={textRef}
-        className="flex-1 overflow-auto min-h-0 hide-scrollbar"
+        className="flex-1 overflow-auto min-h-0 subtle-scrollbar"
       >
         <p className="font-mono text-[12px] leading-[1.7] text-text-tertiary/50 whitespace-pre-wrap break-words selection:bg-accent/20">
           {streamedText}

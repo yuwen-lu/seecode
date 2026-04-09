@@ -91,11 +91,48 @@ body {
   font-family: var(--font-mono), ui-monospace, monospace;
 }
 
-/* Hide scrollbar for streaming loader */
-.hide-scrollbar::-webkit-scrollbar {
-  display: none;
+/* Global custom scrollbars — dark mode */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
 }
-.hide-scrollbar {
-  scrollbar-width: none;
-  -ms-overflow-style: none;
+
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.12);
+  border-radius: 3px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(255, 255, 255, 0.25);
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Subtle scrollbar — only visible on hover (panels, loaders) */
+.subtle-scrollbar {
+  scrollbar-color: transparent transparent;
+}
+.subtle-scrollbar:hover {
+  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+}
+
+.subtle-scrollbar::-webkit-scrollbar-thumb {
+  background-color: transparent;
+}
+.subtle-scrollbar:hover::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.15);
+}
+.subtle-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(255, 255, 255, 0.3);
 }

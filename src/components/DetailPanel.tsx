@@ -311,7 +311,7 @@ function ModuleView({
                 {copied ? <Check size={12} /> : <Copy size={12} />}
               </button>
             </div>
-            <div className="flex-1 overflow-auto hide-scrollbar text-[11px] leading-relaxed">
+            <div className="flex-1 overflow-auto subtle-scrollbar text-[11px] leading-relaxed">
               {highlightedHtml ? (
                 <div
                   className="shiki-container"
