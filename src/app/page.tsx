@@ -3,10 +3,10 @@
 import { useState, useRef, useCallback } from "react";
 import { Header, type RenderMode } from "@/components/Header";
 import { GraphCanvas } from "@/components/GraphCanvas";
-import { DetailPanel } from "@/components/DetailPanel";
+import { DetailPanel, type PanelDepth } from "@/components/DetailPanel";
 import { MermaidDebugView } from "@/components/MermaidDebugView";
 import { StreamingLoader } from "@/components/StreamingLoader";
-import type { ArchGraph, ArchModule, PanelSelection } from "@/types/graph";
+import type { ArchGraph, PanelSelection } from "@/types/graph";
 import { MOCK_CLICKY } from "@/lib/mock-clicky";
 
 export default function Home() {
@@ -20,16 +20,29 @@ export default function Home() {
   const [streamedText, setStreamedText] = useState("");
   const abortRef = useRef<AbortController | null>(null);
 
-  // Derive the selected node ID for canvas highlighting
-  const selectedNodeId = selection
-    ? selection.kind === "module"
-      ? selection.module.id
-      : `group-${selection.category}`
-    : null;
+  // Panel depth + highlight override driven by panel navigation
+  const [panelDepth, setPanelDepth] = useState<PanelDepth | null>(null);
+  const [highlightOverride, setHighlightOverride] = useState<string | null>(null);
 
-  // Called from the component panel when drilling into a module
-  const onDrillToModule = useCallback((mod: ArchModule) => {
-    setSelection({ kind: "module", module: mod });
+  // Derive the selected node ID for canvas highlighting
+  const selectedNodeId = highlightOverride
+    ?? (selection
+      ? selection.kind === "module"
+        ? selection.module.id
+        : `group-${selection.category}`
+      : null);
+
+  // Called by DetailPanel whenever its view changes
+  const onPanelViewChange = useCallback((depth: PanelDepth, moduleId: string | null) => {
+    setPanelDepth(depth);
+    setHighlightOverride(moduleId);
+  }, []);
+
+  // Clear override when selection changes from the canvas
+  const handleSelect = useCallback((sel: PanelSelection | null) => {
+    setSelection(sel);
+    setHighlightOverride(null);
+    setPanelDepth(sel ? (sel.kind === "component" ? "component" : "module") : null);
   }, []);
 
   async function analyzeRepo(url: string) {
@@ -186,8 +199,9 @@ export default function Home() {
             <GraphCanvas
               graph={graph}
               activeTrace={activeTrace}
-              onSelect={setSelection}
+              onSelect={handleSelect}
               selectedNodeId={selectedNodeId}
+              panelDepth={panelDepth}
             />
           )}
 
@@ -211,8 +225,8 @@ export default function Home() {
           <DetailPanel
             selection={selection}
             sourceSnippets={graph?.sourceSnippets}
-            onClose={() => setSelection(null)}
-            onDrillToModule={onDrillToModule}
+            onClose={() => handleSelect(null)}
+            onViewChange={onPanelViewChange}
           />
         )}
       </div>

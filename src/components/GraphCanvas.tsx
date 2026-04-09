@@ -16,6 +16,7 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import type { ArchGraph, ArchModule, NodeCategory, PanelSelection } from "@/types/graph";
+import type { PanelDepth } from "./DetailPanel";
 import { ArchNode } from "./ArchNode";
 import { GroupNode, type GroupNodeData } from "./GroupNode";
 import { DetailSlider } from "./DetailSlider";
@@ -30,6 +31,7 @@ interface GraphCanvasProps {
   activeTrace: string | null;
   onSelect: (selection: PanelSelection | null) => void;
   selectedNodeId: string | null;
+  panelDepth?: PanelDepth | null;
 }
 
 const nodeTypes = {
@@ -42,6 +44,7 @@ function GraphCanvasInner({
   activeTrace,
   onSelect,
   selectedNodeId,
+  panelDepth,
 }: GraphCanvasProps) {
   const { fitView } = useReactFlow();
   const [zoomLevel, setZoomLevel] = useState<ZoomLevel>("collapsed");
@@ -147,23 +150,38 @@ function GraphCanvasInner({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [triggerAnimation, scheduleFitView, locked]);
 
-  // When a module is selected whose category is collapsed, expand all to module level
+  // Sync canvas zoom level with the panel's current depth
   useEffect(() => {
-    if (!selectedNodeId) return;
-    // If the selected node already exists in the current layout, nothing to do
-    if (layout.nodes.some((n) => n.id === selectedNodeId)) return;
-    // The selected node is hidden inside a collapsed group — expand all
-    const mod = graph.modules.find((m) => m.id === selectedNodeId);
-    if (mod && !effectiveExpanded.has(mod.category)) {
-      triggerAnimation();
-      pushExpansion(new Set(allCategories));
-      if (zoomLevel === "collapsed") {
+    if (!panelDepth) return; // no panel open — leave canvas as-is
+
+    if (panelDepth === "component") {
+      // Component level → collapse all
+      if (effectiveExpanded.size > 0) {
+        triggerAnimation();
+        pushExpansion(new Set());
+        prevZoomLevel.current = "collapsed";
+        setZoomLevel("collapsed");
+        scheduleFitView();
+      }
+    } else {
+      // Module or file level → expand all
+      if (effectiveExpanded.size < allCategories.size) {
+        triggerAnimation();
+        pushExpansion(new Set(allCategories));
+        if (zoomLevel === "collapsed") {
+          prevZoomLevel.current = panelDepth === "file" ? "detailed" : "compact";
+          setZoomLevel(panelDepth === "file" ? "detailed" : "compact");
+        }
+        scheduleFitView();
+      } else if (panelDepth === "file" && zoomLevel !== "detailed") {
+        prevZoomLevel.current = "detailed";
+        setZoomLevel("detailed");
+      } else if (panelDepth === "module" && zoomLevel === "detailed") {
         prevZoomLevel.current = "compact";
         setZoomLevel("compact");
       }
-      scheduleFitView();
     }
-  }, [selectedNodeId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [panelDepth]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Track whether this is the first render (skip animation on mount)
   const isInitialRender = useRef(true);
@@ -346,12 +364,14 @@ function GraphCanvasInner({
         <Controls position="bottom-left" showInteractive={false} />
       </ReactFlow>
 
-      <DetailSlider
-        level={displayLevel}
-        locked={locked}
-        onLevelChange={handleLevelChange}
-        onLockedChange={setLocked}
-      />
+      {!panelDepth && (
+        <DetailSlider
+          level={displayLevel}
+          locked={locked}
+          onLevelChange={handleLevelChange}
+          onLockedChange={setLocked}
+        />
+      )}
     </>
   );
 }
