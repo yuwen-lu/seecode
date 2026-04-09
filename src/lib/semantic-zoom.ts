@@ -60,7 +60,7 @@ function makeEdgeStyle(edge: ArchEdge) {
 export function buildHybridGraph(
   graph: ArchGraph,
   expandedCategories: Set<NodeCategory>,
-): { nodes: Node[]; edges: Edge[] } {
+): { nodes: Node[]; edges: Edge[]; nodeIdMap: Map<string, string> } {
   // Group modules by category
   const groups = new Map<NodeCategory, ArchModule[]>();
   for (const mod of graph.modules) {
@@ -167,6 +167,6 @@ export function buildHybridGraph(
     node.position = { x: pos.x - w / 2, y: pos.y - h / 2 };
   }
 
-  return { nodes, edges };
+  return { nodes, edges, nodeIdMap };
 }
 
