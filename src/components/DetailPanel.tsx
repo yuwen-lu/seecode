@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { createPortal } from "react-dom";
-import { Copy, Check, ChevronRight, ChevronLeft, Maximize2, X } from "lucide-react";
+import { Copy, Check, ChevronRight, ChevronLeft, ChevronDown, ChevronUp, Maximize2, X } from "lucide-react";
 import { useTheme } from "next-themes";
 import type { ArchModule, PanelSelection, NodeCategory } from "@/types/graph";
 import { getCategoryColors, CATEGORY_LABELS, githubRawUrl } from "@/types/graph";
@@ -360,40 +360,42 @@ function ModuleBody({
       {mod.files.length > 0 && (
         <div className="shrink-0 mb-4">
           <SectionTitle>Files</SectionTitle>
-          <div className="space-y-0.5">
-            {mod.files.map((f) => (
-              <div
-                key={f}
-                className={`flex items-center justify-between gap-2 text-[13px] font-mono w-full px-1.5 py-1 rounded-lg transition-colors group ${
-                  activeFile === f
-                    ? "bg-surface-2"
-                    : "hover:bg-surface-2"
-                }`}
-                style={{ color: colors.border, opacity: activeFile === f ? 1 : 0.7 }}
-              >
-                <button
-                  onClick={() => setActiveFile(f)}
-                  onDoubleClick={() => onSelectFile(f)}
-                  className="truncate cursor-pointer text-left min-w-0"
+          <CollapsibleSection collapsedHeight={120} itemCount={mod.files.length} threshold={4}>
+            <div className="space-y-0.5">
+              {mod.files.map((f) => (
+                <div
+                  key={f}
+                  className={`flex items-center justify-between gap-2 text-[13px] font-mono w-full px-1.5 py-1 rounded-lg transition-colors group ${
+                    activeFile === f
+                      ? "bg-surface-2"
+                      : "hover:bg-surface-2"
+                  }`}
+                  style={{ color: colors.border, opacity: activeFile === f ? 1 : 0.7 }}
                 >
-                  {f}
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    navigator.clipboard.writeText(f);
-                    setCopiedFile(f);
-                    setTimeout(() => setCopiedFile(null), 1500);
-                  }}
-                  title="Copy file path"
-                  className="shrink-0 cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity"
-                  style={{ color: colors.border }}
-                >
-                  {copiedFile === f ? <Check size={14} /> : <Copy size={14} />}
-                </button>
-              </div>
-            ))}
-          </div>
+                  <button
+                    onClick={() => setActiveFile(f)}
+                    onDoubleClick={() => onSelectFile(f)}
+                    className="truncate cursor-pointer text-left min-w-0"
+                  >
+                    {f}
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigator.clipboard.writeText(f);
+                      setCopiedFile(f);
+                      setTimeout(() => setCopiedFile(null), 1500);
+                    }}
+                    title="Copy file path"
+                    className="shrink-0 cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity"
+                    style={{ color: colors.border }}
+                  >
+                    {copiedFile === f ? <Check size={14} /> : <Copy size={14} />}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </CollapsibleSection>
           {mod.lineCount != null && mod.lineCount > 0 && (
             <p className="text-[13px] text-text-tertiary mt-1">
               {mod.lineCount.toLocaleString()} lines total
@@ -406,20 +408,22 @@ function ModuleBody({
       {mod.keyTypes.length > 0 && (
         <div className="shrink-0 mb-4">
           <SectionTitle>Key Types</SectionTitle>
-          <div className="flex flex-wrap gap-1.5">
-            {mod.keyTypes.map((t) => (
-              <span
-                key={t}
-                className="text-xs font-mono px-2 py-0.5 rounded"
-                style={{
-                  color: colors.border,
-                  background: colors.border + "18",
-                }}
-              >
-                {t}
-              </span>
-            ))}
-          </div>
+          <CollapsibleSection collapsedHeight={56} itemCount={mod.keyTypes.length} threshold={6}>
+            <div className="flex flex-wrap gap-1.5">
+              {mod.keyTypes.map((t) => (
+                <span
+                  key={t}
+                  className="text-xs font-mono px-2 py-0.5 rounded"
+                  style={{
+                    color: colors.border,
+                    background: colors.border + "18",
+                  }}
+                >
+                  {t}
+                </span>
+              ))}
+            </div>
+          </CollapsibleSection>
         </div>
       )}
 
@@ -427,19 +431,21 @@ function ModuleBody({
       {mod.keyMethods.length > 0 && (
         <div className="shrink-0 mb-4">
           <SectionTitle>Key Methods</SectionTitle>
-          <ul className="space-y-0.5">
-            {mod.keyMethods.map((m) => (
-              <li key={m} className="text-xs font-mono text-text-secondary">
-                {m}
-              </li>
-            ))}
-          </ul>
+          <CollapsibleSection collapsedHeight={72} itemCount={mod.keyMethods.length} threshold={4}>
+            <ul className="space-y-0.5">
+              {mod.keyMethods.map((m) => (
+                <li key={m} className="text-xs font-mono text-text-secondary">
+                  {m}
+                </li>
+              ))}
+            </ul>
+          </CollapsibleSection>
         </div>
       )}
 
-      {/* Source Preview — grows to fill remaining space */}
+      {/* Source Preview — grows to fill remaining space, min height reserved */}
       <SectionTitle>Source Preview</SectionTitle>
-      <div className="rounded-lg overflow-hidden border border-border flex flex-col flex-1 min-h-0">
+      <div className="rounded-lg overflow-hidden border border-border flex flex-col flex-1" style={{ minHeight: 200 }}>
         {activeFile && (
           <div className="bg-surface-2 px-3 py-1.5 text-xs font-mono text-text-tertiary border-b border-border shrink-0 flex items-center gap-1.5">
             <span className="truncate flex-1">{activeFile}</span>
@@ -684,6 +690,53 @@ function CodeLightbox({
       </div>
     </div>,
     document.body,
+  );
+}
+
+/* ─── Collapsible list with gradient fade ─── */
+
+function CollapsibleSection({
+  children,
+  collapsedHeight,
+  itemCount,
+  threshold,
+}: {
+  children: React.ReactNode;
+  collapsedHeight: number;
+  itemCount: number;
+  threshold: number;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const shouldCollapse = itemCount > threshold;
+
+  if (!shouldCollapse) return <>{children}</>;
+
+  return (
+    <div>
+      <div className="relative">
+        <div
+          className="overflow-hidden transition-[max-height] duration-300 ease-in-out"
+          style={{ maxHeight: expanded ? 2000 : collapsedHeight }}
+        >
+          {children}
+        </div>
+        {!expanded && (
+          <div
+            className="absolute bottom-0 left-0 right-0 h-10 pointer-events-none"
+            style={{
+              background: "linear-gradient(to bottom, transparent, var(--surface-1))",
+            }}
+          />
+        )}
+      </div>
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="flex items-center gap-1 text-[11px] text-text-tertiary hover:text-text-secondary mt-1 cursor-pointer transition-colors"
+      >
+        {expanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+        {expanded ? "Show less" : `Show all ${itemCount}`}
+      </button>
+    </div>
   );
 }
 
