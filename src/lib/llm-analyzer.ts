@@ -11,7 +11,7 @@ interface LLMAnalysisResult {
   edges: ArchEdge[];
 }
 
-export { buildStructureSummary, buildPrompt, parseResponse };
+export { buildStructureSummary, buildPrompt, parseResponse, enrichModulesWithFiles };
 
 /**
  * Streaming version — yields text chunks as they arrive, then returns the final parsed result.
@@ -199,20 +199,18 @@ function enrichModulesWithFiles(
   for (const mod of modules) {
     // If the LLM already provided valid files, keep them but still add line counts
     if (mod.files && mod.files.length > 0) {
-      // Verify these files actually exist in source (flexible path matching)
-      const validFiles = mod.files
-        .map((f) => {
-          const exact = sourceFiles.find((sf) => sf.relativePath === f);
-          if (exact) return exact.relativePath;
-          const suffix = sourceFiles.find((sf) => sf.relativePath.endsWith(f) || f.endsWith(sf.relativePath));
-          return suffix?.relativePath ?? null;
-        })
-        .filter((f): f is string => f !== null);
-      if (validFiles.length > 0) {
-        mod.files = validFiles;
-        for (const f of validFiles) assignedFiles.add(f);
+      const resolvedFiles: string[] = [];
+      for (const f of mod.files) {
+        const match = sourceFiles.find(
+          (sf) => sf.relativePath === f || sf.relativePath.endsWith("/" + f),
+        );
+        if (match) resolvedFiles.push(match.relativePath);
+      }
+      if (resolvedFiles.length > 0) {
+        mod.files = resolvedFiles;
+        for (const f of resolvedFiles) assignedFiles.add(f);
         if (!mod.lineCount) {
-          mod.lineCount = validFiles.reduce((sum, f) => sum + (fileLineCounts.get(f) ?? 0), 0);
+          mod.lineCount = resolvedFiles.reduce((sum, f) => sum + (fileLineCounts.get(f) ?? 0), 0);
         }
         continue;
       }
@@ -269,7 +267,7 @@ function enrichModulesWithFiles(
 }
 
 function parseResponse(text: string): LLMAnalysisResult {
-  const jsonMatch = text.match(/```json\n([\s\S]*?)```/);
+  const jsonMatch = text.match(/```json\r?\n([\s\S]*?)```/);
   if (!jsonMatch) {
     throw new Error("LLM response did not contain a valid JSON block");
   }

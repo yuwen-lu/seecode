@@ -17,8 +17,8 @@ export function extractGo(filePath: string, relativePath: string): ExtractedFile
   const imports: ExtractedImport[] = [];
   const exports: string[] = [];
 
-  // Collect structs and interfaces (Go's "classes")
   const structMap = new Map<string, ExtractedClass>();
+  const deferredMethods: { receiverType: string; method: ExtractedFunction }[] = [];
 
   for (let i = 0; i < root.childCount; i++) {
     const node = root.child(i)!;
@@ -55,11 +55,24 @@ export function extractGo(filePath: string, relativePath: string): ExtractedFile
         const cls = structMap.get(receiverType);
         if (cls) {
           cls.methods.push(method);
+        } else {
+          deferredMethods.push({ receiverType, method });
         }
       }
     } else if (node.type === "import_declaration") {
       extractImports(node, imports);
     }
+  }
+
+  for (const { receiverType, method } of deferredMethods) {
+    let cls = structMap.get(receiverType);
+    if (!cls) {
+      cls = { name: receiverType, methods: [], properties: [] };
+      structMap.set(receiverType, cls);
+      classes.push(cls);
+      if (isExported(receiverType)) exports.push(receiverType);
+    }
+    cls.methods.push(method);
   }
 
   return { filePath: relativePath, language: "go", classes, functions, imports, exports };
@@ -84,8 +97,9 @@ function extractInterface(name: string, typeNode: Parser.SyntaxNode): ExtractedC
   const methods: ExtractedFunction[] = [];
   for (let i = 0; i < typeNode.childCount; i++) {
     const spec = typeNode.child(i)!;
-    if (spec.type === "method_spec") {
-      const methodName = spec.childForFieldName("name")?.text;
+    if (spec.type === "method_spec" || spec.type === "method_elem") {
+      const methodName = spec.childForFieldName("name")?.text
+        ?? findChild(spec, ["field_identifier"])?.text;
       if (methodName) {
         const params = extractParams(spec);
         methods.push({ name: methodName, params });

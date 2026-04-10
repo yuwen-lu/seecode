@@ -188,21 +188,21 @@ function extractImport(node: Parser.SyntaxNode): ExtractedImport | null {
   const names: string[] = [];
   let isDefault = false;
 
-  // import X from "..."
-  const defaultImport = findChildByTypes(node, ["identifier"]);
-  if (defaultImport && defaultImport.previousSibling?.type === "import") {
-    names.push(defaultImport.text);
-    isDefault = true;
-  }
-
-  // import { A, B } from "..."
-  const namedImports = findChildByTypes(node, ["import_clause", "named_imports"]);
-  if (namedImports) {
-    for (let i = 0; i < namedImports.childCount; i++) {
-      const spec = namedImports.child(i)!;
-      if (spec.type === "import_specifier") {
-        const imported = spec.childForFieldName("name")?.text ?? spec.child(0)?.text;
-        if (imported) names.push(imported);
+  const importClause = findChildByTypes(node, ["import_clause"]);
+  if (importClause) {
+    for (let i = 0; i < importClause.childCount; i++) {
+      const child = importClause.child(i)!;
+      if (child.type === "identifier") {
+        names.push(child.text);
+        isDefault = true;
+      } else if (child.type === "named_imports") {
+        for (let j = 0; j < child.childCount; j++) {
+          const spec = child.child(j)!;
+          if (spec.type === "import_specifier") {
+            const imported = spec.childForFieldName("name")?.text ?? spec.child(0)?.text;
+            if (imported) names.push(imported);
+          }
+        }
       }
     }
   }

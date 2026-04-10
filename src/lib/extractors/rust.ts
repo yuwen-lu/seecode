@@ -217,7 +217,8 @@ function isPub(node: Parser.SyntaxNode): boolean {
 }
 
 function nodeContains(node: Parser.SyntaxNode, keyword: string): boolean {
-  return node.text.startsWith(keyword + " ") || node.text.startsWith("pub " + keyword + " ");
+  const re = new RegExp(`(?:^|\\s)${keyword}\\s`);
+  return re.test(node.text.slice(0, 40));
 }
 
 function findChild(node: Parser.SyntaxNode, types: string[]): Parser.SyntaxNode | null {
