@@ -2,6 +2,7 @@
 
 import { memo } from "react";
 import { Handle, Position } from "@xyflow/react";
+import { FileCode, Box, Braces } from "lucide-react";
 import type { ArchModule } from "@/types/graph";
 import { getCategoryColors, CATEGORY_LABELS } from "@/types/graph";
 import type { ZoomLevel } from "@/lib/semantic-zoom";
@@ -36,12 +37,12 @@ export const ArchNode = memo(function ArchNode({
           opacity: dimmed ? 0.5 : 1,
         }}
       >
-        {/* Category accent + name */}
-        <div className="flex items-center gap-1.5">
-          <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: colors.border }} />
-          <span className="text-[13px] font-semibold leading-tight text-foreground truncate">
-            {mod.name}
-          </span>
+        {/* Category label + name */}
+        <span className="text-[8px] font-medium uppercase tracking-wide" style={{ color: colors.border }}>
+          {CATEGORY_LABELS[mod.category]}
+        </span>
+        <div className="text-[13px] font-semibold leading-tight text-foreground truncate">
+          {mod.name}
         </div>
 
         {/* Responsibility */}
@@ -51,54 +52,48 @@ export const ArchNode = memo(function ArchNode({
           </p>
         )}
 
-        {/* Key types */}
-        {showDetail && mod.keyTypes.length > 0 && (
-          <div className="flex flex-wrap gap-1 mt-1.5">
-            {mod.keyTypes.slice(0, 4).map((t) => (
-              <span
-                key={t}
-                className="text-[9px] px-1 py-0.5 rounded font-mono bg-surface-2 text-text-secondary"
-              >
-                {t}
-              </span>
-            ))}
-          </div>
-        )}
-
-        {/* Key methods */}
-        {showDetail && mod.keyMethods.length > 0 && (
-          <div className="mt-1.5 pt-1.5 space-y-0.5 border-t border-border">
-            {mod.keyMethods.slice(0, 3).map((m) => (
-              <div key={m} className="text-[9px] font-mono truncate text-text-tertiary">
-                {m}
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Files */}
+        {/* Files — accent-colored, top-level in hierarchy */}
         {showDetail && mod.files.length > 0 && (
-          <div className="mt-1.5 pt-1 space-y-0.5 border-t border-border">
-            {mod.files.slice(0, 3).map((f) => (
-              <div key={f} className="text-[8px] font-mono truncate text-text-tertiary">
-                {f}
-              </div>
-            ))}
+          <div className="mt-1.5 space-y-0.5">
+            {mod.files.slice(0, 3).map((f) => {
+              const parts = f.split("/");
+              const display = parts.length > 1 ? parts.slice(1).join("/") : f;
+              return (
+                <div key={f} title={f} className="flex items-center gap-1.5 text-[9px] font-mono truncate" style={{ color: colors.border }}>
+                  <FileCode size={10} className="shrink-0 opacity-70" />
+                  {display}
+                </div>
+              );
+            })}
             {mod.files.length > 3 && (
-              <div className="text-[8px] text-text-tertiary">
+              <div className="text-[8px] pl-4 opacity-60" style={{ color: colors.border }}>
                 +{mod.files.length - 3} more
               </div>
             )}
           </div>
         )}
 
+        {/* Key types & methods — indented under files */}
+        {showDetail && (mod.keyTypes.length > 0 || mod.keyMethods.length > 0) && (
+          <div className="mt-1 ml-4 space-y-px">
+            {mod.keyTypes.slice(0, 4).map((t) => (
+              <div key={t} title={`Type / class: ${t}`} className="flex items-center gap-1 text-[9px] font-mono truncate text-text-tertiary">
+                <Box size={9} className="shrink-0" />
+                {t}
+              </div>
+            ))}
+            {mod.keyMethods.slice(0, 3).map((m) => (
+              <div key={m} title={`Method / function: ${m}`} className="flex items-center gap-1 text-[9px] font-mono truncate text-text-tertiary">
+                <Braces size={9} className="shrink-0" />
+                {m}
+              </div>
+            ))}
+          </div>
+        )}
+
         {/* Stats line */}
         {showCompact && (
-          <div className="text-[9px] mt-1.5 flex items-center gap-1.5 text-text-tertiary">
-            <span className="text-[8px] font-medium uppercase tracking-wide" style={{ color: colors.border }}>
-              {CATEGORY_LABELS[mod.category]}
-            </span>
-            <span>·</span>
+          <div className="text-[9px] mt-1.5 text-text-tertiary">
             {mod.files.length} file{mod.files.length !== 1 ? "s" : ""}
             {mod.lineCount ? ` · ${mod.lineCount} lines` : ""}
           </div>
