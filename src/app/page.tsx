@@ -1,10 +1,9 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
-import { Header, type RenderMode } from "@/components/Header";
+import { Header } from "@/components/Header";
 import { GraphCanvas } from "@/components/GraphCanvas";
 import { DetailPanel, type PanelDepth } from "@/components/DetailPanel";
-import { MermaidDebugView } from "@/components/MermaidDebugView";
 import { StreamingLoader } from "@/components/StreamingLoader";
 import { ChatPanel } from "@/components/ChatPanel";
 import type { ArchGraph, NodeCategory, PanelSelection } from "@/types/graph";
@@ -40,7 +39,6 @@ export default function Home() {
   const [activeTrace, setActiveTrace] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [renderMode, setRenderMode] = useState<RenderMode>("reactflow");
   const [loadingStatus, setLoadingStatus] = useState("Analyzing...");
   const [streamedText, setStreamedText] = useState("");
   const abortRef = useRef<AbortController | null>(null);
@@ -231,13 +229,7 @@ export default function Home() {
     <div className="flex flex-col h-full">
       <Header
         repoName={graph?.repoName}
-        traces={graph?.traces ?? []}
-        activeTrace={activeTrace}
-        onActiveTraceChange={setActiveTrace}
         onGoHome={goHome}
-        renderMode={renderMode}
-        onRenderModeChange={setRenderMode}
-        hasMermaid={!!graph?.mermaid}
       />
 
       {/* Trace description bar */}
@@ -298,7 +290,7 @@ export default function Home() {
             </div>
           )}
 
-          {graph && renderMode === "reactflow" && (
+          {graph && (
             <GraphCanvas
               graph={graph}
               activeTrace={activeTrace}
@@ -309,23 +301,11 @@ export default function Home() {
               chatHighlights={chatHighlights}
             />
           )}
-
-          {graph && renderMode === "mermaid" && (
-            graph.mermaid ? (
-              <MermaidDebugView mermaidSource={graph.mermaid} />
-            ) : (
-              <div className="absolute inset-0 flex items-center justify-center">
-                <p className="text-text-secondary text-sm">
-                  No Mermaid diagram available.
-                </p>
-              </div>
-            )
-          )}
         </div>
       </div>
 
       {/* Chat panel — floating bottom-right overlay */}
-      {graph && renderMode === "reactflow" && (
+      {graph && (
         <ChatPanel modules={graph.modules} onFileClick={handleChatFileClick} />
       )}
     </div>
