@@ -43,7 +43,6 @@ export interface ArchGraph {
   modules: ArchModule[];
   edges: ArchEdge[];
   traces: DataTrace[];
-  mermaid?: string; // Raw Mermaid source for debug view
 }
 
 /** Panel selection — either a component (group) or a specific module */

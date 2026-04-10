@@ -10,7 +10,6 @@ interface LLMAnalysisResult {
   modules: ArchModule[];
   edges: ArchEdge[];
   traces: DataTrace[];
-  mermaid: string;
 }
 
 export { buildStructureSummary, buildPrompt, parseResponse };
@@ -127,17 +126,7 @@ function buildStructureSummary(
 function buildPrompt(structureSummary: string, repoName: string): string {
   return `You are analyzing the architecture of the GitHub repository "${repoName}".
 
-Below is the extracted code structure. Analyze it and produce TWO outputs:
-
-1. A **Mermaid flowchart** (graph TB) showing the high-level architecture
-2. A **structured JSON** object describing modules, edges, and data flow traces
-
-Rules for the Mermaid diagram:
-- Use \`graph TB\` (top-to-bottom)
-- Group related nodes into subgraphs
-- Use short, readable node labels
-- Show the most important relationships (don't include every single import)
-- IMPORTANT: Do NOT use Mermaid reserved words as node IDs. Reserved words include: TB, BT, LR, RL, TD, BR, end, graph, subgraph, style, class, click, linkStyle. Use longer descriptive IDs like \`TabsComp\` instead of \`TB\`, or \`BtnComp\` instead of \`BT\`.
+Below is the extracted code structure. Analyze it and produce a **structured JSON** object describing modules, edges, and data flow traces.
 
 Rules for the JSON:
 - Each module should represent a logical component (not every single file — group related files)
@@ -149,11 +138,6 @@ Rules for the JSON:
 - Include 1-3 data flow traces showing how a request/operation moves through the system
 
 Respond in EXACTLY this format (no other text):
-
-\`\`\`mermaid
-graph TB
-  ...your diagram...
-\`\`\`
 
 \`\`\`json
 {
@@ -278,11 +262,6 @@ function enrichModulesWithFiles(
 }
 
 function parseResponse(text: string): LLMAnalysisResult {
-  // Extract mermaid block
-  const mermaidMatch = text.match(/```mermaid\n([\s\S]*?)```/);
-  const mermaid = mermaidMatch?.[1]?.trim() ?? "";
-
-  // Extract JSON block
   const jsonMatch = text.match(/```json\n([\s\S]*?)```/);
   if (!jsonMatch) {
     throw new Error("LLM response did not contain a valid JSON block");
@@ -297,7 +276,6 @@ function parseResponse(text: string): LLMAnalysisResult {
 
   const modules = (parsed.modules ?? []).map((m) => ({
     ...m,
-    // Ensure required fields have defaults
     keyTypes: m.keyTypes ?? [],
     keyMethods: m.keyMethods ?? [],
     files: m.files ?? [],
@@ -307,6 +285,5 @@ function parseResponse(text: string): LLMAnalysisResult {
     modules,
     edges: parsed.edges ?? [],
     traces: parsed.traces ?? [],
-    mermaid,
   };
 }

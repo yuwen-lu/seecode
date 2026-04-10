@@ -88,7 +88,6 @@ export async function POST(request: NextRequest) {
           modules: llmResult.modules,
           edges: llmResult.edges,
           traces: llmResult.traces,
-          mermaid: llmResult.mermaid,
         };
 
         cacheGraph(graph);
