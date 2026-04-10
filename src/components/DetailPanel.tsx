@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { createPortal } from "react-dom";
 import { Copy, Check, ChevronRight, ChevronLeft, Maximize2, X } from "lucide-react";
 import { useTheme } from "next-themes";
 import type { ArchModule, PanelSelection, NodeCategory } from "@/types/graph";
@@ -202,6 +203,8 @@ function ComponentBody({
   view: Extract<PanelView, { level: "component" }>;
   onSelectModule: (mod: ArchModule) => void;
 }) {
+  const { theme } = useTheme();
+  const colors = getCategoryColors(theme === "dark")[view.category];
   const totalLines = view.members.reduce((sum, m) => sum + (m.lineCount ?? 0), 0);
   const totalFiles = view.members.reduce((sum, m) => sum + m.files.length, 0);
 
@@ -235,7 +238,11 @@ function ComponentBody({
                 {mod.keyTypes.slice(0, 3).map((t) => (
                   <span
                     key={t}
-                    className="text-[13px] font-mono px-1.5 py-0.5 rounded bg-surface-2 text-accent"
+                    className="text-[13px] font-mono px-1.5 py-0.5 rounded"
+                    style={{
+                      color: colors.border,
+                      background: colors.border + "18",
+                    }}
                   >
                     {t}
                   </span>
@@ -273,6 +280,8 @@ function ModuleBody({
 }) {
   const { theme } = useTheme();
   const shikiTheme = theme === "light" ? "github-light-default" : "github-dark-default";
+  const colors = getCategoryColors(theme === "dark")[mod.category];
+  const [copiedFile, setCopiedFile] = useState<string | null>(null);
   const [activeFile, setActiveFile] = useState<string | null>(
     mod.files.length > 0 ? mod.files[0] : null
   );
@@ -353,19 +362,36 @@ function ModuleBody({
           <SectionTitle>Files</SectionTitle>
           <div className="space-y-0.5">
             {mod.files.map((f) => (
-              <button
+              <div
                 key={f}
-                onClick={() => setActiveFile(f)}
-                onDoubleClick={() => onSelectFile(f)}
-                className={`flex items-center justify-between gap-2 text-[13px] font-mono w-full px-1.5 py-1 rounded transition-colors cursor-pointer group ${
+                className={`flex items-center justify-between gap-2 text-[13px] font-mono w-full px-1.5 py-1 rounded-lg transition-colors group ${
                   activeFile === f
-                    ? "bg-accent/15 text-accent"
-                    : "text-text-tertiary hover:text-text-secondary hover:bg-surface-2"
+                    ? "bg-surface-2"
+                    : "hover:bg-surface-2"
                 }`}
+                style={{ color: colors.border, opacity: activeFile === f ? 1 : 0.7 }}
               >
-                <span className="truncate">{f}</span>
-                <ChevronRight size={12} className="shrink-0 text-text-tertiary group-hover:text-accent opacity-0 group-hover:opacity-100 transition-opacity" />
-              </button>
+                <button
+                  onClick={() => setActiveFile(f)}
+                  onDoubleClick={() => onSelectFile(f)}
+                  className="truncate cursor-pointer text-left min-w-0"
+                >
+                  {f}
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigator.clipboard.writeText(f);
+                    setCopiedFile(f);
+                    setTimeout(() => setCopiedFile(null), 1500);
+                  }}
+                  title="Copy file path"
+                  className="shrink-0 cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity"
+                  style={{ color: colors.border }}
+                >
+                  {copiedFile === f ? <Check size={14} /> : <Copy size={14} />}
+                </button>
+              </div>
             ))}
           </div>
           {mod.lineCount != null && mod.lineCount > 0 && (
@@ -384,7 +410,11 @@ function ModuleBody({
             {mod.keyTypes.map((t) => (
               <span
                 key={t}
-                className="text-xs font-mono px-2 py-0.5 rounded bg-surface-2 text-accent"
+                className="text-xs font-mono px-2 py-0.5 rounded"
+                style={{
+                  color: colors.border,
+                  background: colors.border + "18",
+                }}
               >
                 {t}
               </span>
@@ -419,7 +449,7 @@ function ModuleBody({
                 title="Expand preview"
                 className="shrink-0 cursor-pointer text-text-tertiary hover:text-text-secondary"
               >
-                <Maximize2 size={12} />
+                <Maximize2 size={14} />
               </button>
             )}
           </div>
@@ -545,7 +575,7 @@ function FileBody({
           title="Copy file path"
           className="shrink-0 cursor-pointer text-text-tertiary hover:text-text-secondary"
         >
-          {copied ? <Check size={12} /> : <Copy size={12} />}
+          {copied ? <Check size={14} /> : <Copy size={14} />}
         </button>
       </div>
 
@@ -600,9 +630,9 @@ function CodeLightbox({
     return () => window.removeEventListener("keydown", handleKey);
   }, [onClose]);
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
+      className="fixed inset-0 z-[100] flex items-center justify-center"
       onClick={onClose}
     >
       {/* Backdrop */}
@@ -611,7 +641,7 @@ function CodeLightbox({
       {/* Modal */}
       <div
         className="relative bg-surface-1 border border-border rounded-xl shadow-2xl flex flex-col overflow-hidden"
-        style={{ width: "min(90vw, 900px)", height: "min(85vh, 700px)" }}
+        style={{ width: "min(94vw, 1200px)", height: "min(92vh, 900px)" }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -627,7 +657,7 @@ function CodeLightbox({
               title="Copy file path"
               className="shrink-0 cursor-pointer text-text-tertiary hover:text-text-secondary"
             >
-              {copied ? <Check size={12} /> : <Copy size={12} />}
+              {copied ? <Check size={14} /> : <Copy size={14} />}
             </button>
           </div>
           <button
@@ -639,7 +669,7 @@ function CodeLightbox({
         </div>
 
         {/* Code */}
-        <div className="flex-1 overflow-auto subtle-scrollbar text-[12px] leading-relaxed">
+        <div className="flex-1 overflow-auto subtle-scrollbar text-[13px] leading-relaxed">
           {highlightedHtml ? (
             <div
               className="shiki-container"
@@ -652,7 +682,8 @@ function CodeLightbox({
           ) : null}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
