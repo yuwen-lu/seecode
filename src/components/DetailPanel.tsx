@@ -165,6 +165,7 @@ function PanelHeader({
         {canGoBack && (
           <button
             onClick={onBack}
+            aria-label="Go back"
             className="shrink-0 cursor-pointer text-text-tertiary hover:text-foreground p-0.5 -ml-0.5"
           >
             <ChevronLeft size={16} />
@@ -186,6 +187,7 @@ function PanelHeader({
       </div>
       <button
         onClick={onClose}
+        aria-label="Close panel"
         className="text-text-tertiary hover:text-foreground p-1 rounded hover:bg-surface-2 transition-colors cursor-pointer shrink-0"
       >
         <X size={14} />
@@ -386,7 +388,7 @@ function ModuleBody({
                       setCopiedFile(f);
                       setTimeout(() => setCopiedFile(null), 1500);
                     }}
-                    title="Copy file path"
+                    aria-label="Copy file path"
                     className="shrink-0 cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity"
                     style={{ color: colors.border }}
                   >
@@ -452,7 +454,7 @@ function ModuleBody({
             {(sourceCode || highlightedHtml) && (
               <button
                 onClick={() => setLightboxOpen(true)}
-                title="Expand preview"
+                aria-label="Expand code preview"
                 className="shrink-0 cursor-pointer text-text-tertiary hover:text-text-secondary"
               >
                 <Maximize2 size={14} />
@@ -578,7 +580,7 @@ function FileBody({
             setCopied(true);
             setTimeout(() => setCopied(false), 1500);
           }}
-          title="Copy file path"
+          aria-label="Copy file path"
           className="shrink-0 cursor-pointer text-text-tertiary hover:text-text-secondary"
         >
           {copied ? <Check size={14} /> : <Copy size={14} />}
@@ -660,7 +662,7 @@ function CodeLightbox({
                 setCopied(true);
                 setTimeout(() => setCopied(false), 1500);
               }}
-              title="Copy file path"
+              aria-label="Copy file path"
               className="shrink-0 cursor-pointer text-text-tertiary hover:text-text-secondary"
             >
               {copied ? <Check size={14} /> : <Copy size={14} />}
@@ -668,6 +670,7 @@ function CodeLightbox({
           </div>
           <button
             onClick={onClose}
+            aria-label="Close code preview"
             className="shrink-0 cursor-pointer text-text-tertiary hover:text-foreground p-1"
           >
             <X size={16} />

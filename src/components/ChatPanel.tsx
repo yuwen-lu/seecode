@@ -221,12 +221,12 @@ export function ChatPanel({ graph, onFileClick }: ChatPanelProps) {
                 Chat
               </span>
               {messages.length > 0 && (
-                <button onClick={clearChat} className="p-1 text-text-tertiary hover:text-text-secondary transition-colors cursor-pointer" title="New chat">
+                <button onClick={clearChat} className="p-1 text-text-tertiary hover:text-text-secondary transition-colors cursor-pointer" title="New chat" aria-label="Start new chat">
                   <Plus size={14} />
                 </button>
               )}
             </div>
-            <button onClick={() => setOpen(false)} className="p-1 text-text-tertiary hover:text-text-secondary transition-colors cursor-pointer" title="Minimize">
+            <button onClick={() => setOpen(false)} className="p-1 text-text-tertiary hover:text-text-secondary transition-colors cursor-pointer" aria-label="Minimize chat panel">
               <RectangleHorizontal size={14} />
             </button>
           </div>
@@ -274,7 +274,7 @@ export function ChatPanel({ graph, onFileClick }: ChatPanelProps) {
 
           <div className="px-3 py-2.5 shrink-0">
             {isStreaming && (
-              <div className="flex items-center px-2 pb-2.5">
+              <div className="flex items-center px-2 pb-2.5" role="status" aria-label="Generating response">
                 <DotLoader />
               </div>
             )}
@@ -285,17 +285,18 @@ export function ChatPanel({ graph, onFileClick }: ChatPanelProps) {
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder={contextLabel ? `Ask about ${contextLabel}...` : "Ask about this codebase..."}
+                aria-label="Chat message"
                 rows={1}
                 className="flex-1 bg-transparent text-sm text-foreground placeholder:text-text-tertiary resize-none outline-none overflow-y-auto py-1"
                 style={{ lineHeight: "1.5", maxHeight: `${1.5 * 14 * 3 + 8}px` }}
               />
               {isStreaming ? (
-                <button onClick={() => abortRef.current?.abort()} className="shrink-0 p-1 rounded text-text-secondary hover:text-foreground transition-colors cursor-pointer">
+                <button onClick={() => abortRef.current?.abort()} className="shrink-0 p-1 rounded text-text-secondary hover:text-foreground transition-colors cursor-pointer" aria-label="Stop generating">
                   <X size={15} />
                 </button>
               ) : (
                 <button onClick={() => sendMessage()} disabled={!input.trim() || !canvasContext}
-                  className="shrink-0 p-1 rounded text-text-secondary hover:text-foreground transition-colors disabled:opacity-30 disabled:pointer-events-none cursor-pointer">
+                  className="shrink-0 p-1 rounded text-text-secondary hover:text-foreground transition-colors disabled:opacity-30 disabled:pointer-events-none cursor-pointer" aria-label="Send message">
                   <Send size={15} />
                 </button>
               )}
@@ -322,6 +323,7 @@ function ExplorationSection({ toolCalls, isLive }: { toolCalls: ToolCallInfo[]; 
     <div className="mb-2 rounded-lg border border-border/60 overflow-hidden">
       <button
         onClick={() => setExpanded(!expanded)}
+        aria-expanded={expanded}
         className="w-full flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-text-secondary hover:text-text-primary bg-surface-2/30 transition-colors cursor-pointer"
       >
         {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}

@@ -21,7 +21,7 @@ export function StreamingLoader({ status, streamedText, onStop }: StreamingLoade
   return (
     <div className="absolute inset-0 flex flex-col" style={{ padding: "8% 12%" }}>
       {/* Status + stop button */}
-      <div className="flex items-center gap-3 mb-4 shrink-0">
+      <div className="flex items-center gap-3 mb-4 shrink-0" role="status" aria-live="polite">
         <DotLoader />
         <p className="text-text-secondary text-sm flex-1">{status}</p>
         <button

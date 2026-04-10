@@ -362,6 +362,7 @@ function HomeView({
             value={url}
             onChange={(e) => setUrl(e.target.value)}
             placeholder="https://github.com/owner/repo"
+            aria-label="GitHub repository URL"
             className="flex-1 px-3 py-2 text-sm bg-surface-1 border border-border rounded-lg text-foreground placeholder:text-text-tertiary focus:outline-none focus:border-accent"
             autoFocus
           />
