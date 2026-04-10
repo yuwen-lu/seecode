@@ -97,6 +97,11 @@ export default function Home() {
     });
   }
 
+  // Auto-load demo graph on mount (analysis disabled on prod for now)
+  useEffect(() => {
+    if (!graph) loadGraph(MOCK_CLICKY);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Sync canvas context to chat store
   useEffect(() => {
     if (!graph) return;
@@ -245,6 +250,7 @@ export default function Home() {
 
         {/* Canvas — fills full space */}
         <div className="absolute inset-0">
+          {/* HomeView and analysis flow disabled on prod — git clone not available on Vercel serverless
           {showHome && (
             <HomeView onAnalyze={analyzeRepo} mockGraph={MOCK_CLICKY} onLoadGraph={loadGraph} />
           )}
@@ -275,6 +281,7 @@ export default function Home() {
               </div>
             </div>
           )}
+          End of disabled HomeView/analysis block */}
 
           {graph && (
             <GraphCanvas
