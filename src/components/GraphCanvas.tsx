@@ -361,9 +361,9 @@ function GraphCanvasInner({
           animated: isOnTrace,
           style: {
             ...edge.style,
-            stroke: isOnTrace ? "var(--accent)" : (edge.style?.stroke ?? "var(--edge-default)"),
-            strokeWidth: isOnTrace ? 3 : (Number(edge.style?.strokeWidth) || 1.5),
-            opacity: isOnTrace ? 1 : 0.3,
+            stroke: isOnTrace ? "var(--foreground)" : (edge.style?.stroke ?? "var(--edge-default)"),
+            strokeWidth: isOnTrace ? 2 : (Number(edge.style?.strokeWidth) || 1.5),
+            opacity: isOnTrace ? 0.7 : 0.15,
           },
         };
       })
@@ -513,13 +513,15 @@ function GraphCanvasInner({
               ? dynamicTrace.steps.findIndex((s) => s.moduleId === n.id)
               : -1;
             const isHoveredTraceNode = hoveredTraceModuleId === n.id;
+            // When hovering a specific trace step, dim the other trace nodes
+            const traceStepDimmed = !!hoveredTraceModuleId && traceStepIdx >= 0 && !isHoveredTraceNode;
 
             return {
               ...n,
               selected: isSelected,
               data: {
                 ...n.data,
-                dimmed: dimmedByTrace || (dimmedBySelection && !isSibling),
+                dimmed: dimmedByTrace || traceStepDimmed || (dimmedBySelection && !isSibling),
                 sibling: isSibling && !dimmedByTrace,
                 zoomLevel: n.type === "groupNode"
                   ? zoomLevel

@@ -5,6 +5,7 @@ import { Send, X, FileText, Loader2, MessageCircle, RectangleHorizontal, Plus, C
 import Markdown from "react-markdown";
 import { useChatStore } from "@/store/chat-store";
 import { buildFileIndex } from "@/lib/chat-references";
+import { DotLoader } from "./DotLoader";
 import type { ArchGraph, ArchModule, NodeCategory, DynamicTrace } from "@/types/graph";
 import type { ChatMessage, FileReference, ToolCallInfo } from "@/types/chat";
 
@@ -196,7 +197,7 @@ export function ChatPanel({ graph, onFileClick }: ChatPanelProps) {
     <>
       {!isOpen && (
         <button
-          onClick={() => { clearChat(); setOpen(true); }}
+          onClick={toggleOpen}
           className="fixed bottom-5 right-5 z-40 p-3 rounded-full bg-surface-1 border border-border text-text-secondary hover:text-foreground hover:border-border-strong transition-all cursor-pointer"
         >
           <MessageCircle size={18} />
@@ -214,7 +215,7 @@ export function ChatPanel({ graph, onFileClick }: ChatPanelProps) {
           />
 
           <div className="flex items-center justify-between px-4 py-2.5 border-b border-border shrink-0">
-            <span className="text-xs font-medium text-text-secondary truncate">
+            <span className="text-sm font-medium text-text-secondary truncate">
               Chat
             </span>
             <div className="flex items-center gap-0.5 shrink-0">
@@ -229,10 +230,10 @@ export function ChatPanel({ graph, onFileClick }: ChatPanelProps) {
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto subtle-scrollbar px-4 py-3">
+          <div className="flex-1 overflow-y-auto overflow-x-hidden subtle-scrollbar px-4 py-3">
             {messages.length === 0 && (
               <div className="h-full flex flex-col items-center justify-center gap-5">
-                <p className="text-text-tertiary text-xs text-center leading-relaxed">
+                <p className="text-text-tertiary text-sm text-center leading-relaxed">
                   Ask questions about the codebase.<br />
                   Select a module on the canvas for context.
                 </p>
@@ -243,7 +244,7 @@ export function ChatPanel({ graph, onFileClick }: ChatPanelProps) {
                       onClick={() => sendMessage(q)}
                       onMouseEnter={() => setInput(q)}
                       onMouseLeave={() => setInput("")}
-                      className="text-xs text-text-secondary hover:text-foreground px-3 py-2 rounded-full border border-border hover:border-border-strong hover:bg-surface-2/80 transition-colors cursor-pointer"
+                      className="text-sm text-text-secondary hover:text-foreground px-3 py-2 rounded-full border border-border hover:border-border-strong hover:bg-surface-2/80 transition-colors cursor-pointer"
                     >
                       {q}
                     </button>
@@ -267,6 +268,11 @@ export function ChatPanel({ graph, onFileClick }: ChatPanelProps) {
           </div>
 
           <div className="px-3 py-2.5 shrink-0">
+            {isStreaming && (
+              <div className="flex items-center px-2 pb-2.5">
+                <DotLoader />
+              </div>
+            )}
             <div className="flex items-center gap-2 rounded-2xl border border-border bg-background px-3 py-1.5 focus-within:border-border-strong transition-colors">
               <textarea
                 ref={inputRef}
@@ -311,7 +317,7 @@ function ExplorationSection({ toolCalls, isLive }: { toolCalls: ToolCallInfo[]; 
     <div className="mb-2 rounded-lg border border-border/60 overflow-hidden">
       <button
         onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] text-text-secondary hover:text-text-primary bg-surface-2/30 transition-colors cursor-pointer"
+        className="w-full flex items-center gap-1.5 px-2.5 py-1.5 text-xs text-text-secondary hover:text-text-primary bg-surface-2/30 transition-colors cursor-pointer"
       >
         {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
         <Search size={10} className={isLive ? "animate-pulse" : ""} />
@@ -323,7 +329,7 @@ function ExplorationSection({ toolCalls, isLive }: { toolCalls: ToolCallInfo[]; 
       {expanded && (
         <div className="px-2.5 py-1.5 space-y-0.5 bg-surface-2/15">
           {toolCalls.map((tc, i) => (
-            <div key={i} className="flex items-center gap-1.5 text-[10px] text-text-tertiary font-mono">
+            <div key={i} className="flex items-center gap-1.5 text-xs text-text-tertiary font-mono">
               <span className="text-text-secondary">{TOOL_LABELS[tc.tool] ?? tc.tool}</span>
               <span className="truncate opacity-70">
                 {formatToolInput(tc)}
@@ -353,19 +359,20 @@ function TraceCard({ trace, modules, onFileClick }: {
   const { setHoveredStep } = useChatStore();
 
   return (
-    <div className="mt-3 rounded-lg border border-accent/30 overflow-hidden">
-      <div className="px-3 py-1.5 bg-accent/8 border-b border-accent/20">
-        <span className="text-[11px] font-medium text-accent">
-          Trace: {trace.name}
+    <div className="mt-3 rounded-lg border border-border/60 overflow-hidden">
+      <div className="px-3 py-1.5 border-b border-border/40">
+        <span className="text-sm font-medium uppercase tracking-wider text-text-tertiary">
+          {trace.name}
         </span>
       </div>
-      <div className="divide-y divide-border/40">
+      <div>
         {trace.steps.map((step, i) => {
           const mod = modules.find((m) => m.id === step.moduleId);
+          const isLast = i === trace.steps.length - 1;
           return (
             <div
               key={i}
-              className="px-3 py-2 hover:bg-accent/5 transition-colors cursor-default group"
+              className="relative px-3 py-2 hover:bg-surface-2/40 transition-colors cursor-pointer"
               onMouseEnter={() => setHoveredStep(i)}
               onMouseLeave={() => setHoveredStep(null)}
               onClick={() => {
@@ -374,30 +381,34 @@ function TraceCard({ trace, modules, onFileClick }: {
                 }
               }}
             >
+              {/* Vertical connector line */}
+              {!isLast && (
+                <div className="absolute left-[21px] top-[26px] bottom-0 w-px bg-border/40" />
+              )}
               <div className="flex items-center gap-2">
-                <span className="shrink-0 w-5 h-5 rounded-full bg-accent/15 text-accent text-[10px] font-bold flex items-center justify-center">
+                <span className="relative z-[1] shrink-0 w-5 h-5 rounded-full bg-surface-2 border border-border/60 text-text-tertiary text-sm font-medium flex items-center justify-center">
                   {i + 1}
                 </span>
-                <span className="text-xs font-medium text-foreground truncate">
+                <span className="text-sm font-medium text-foreground truncate">
                   {mod?.name ?? step.moduleId}
                 </span>
               </div>
-              <p className="text-[11px] text-text-secondary mt-0.5 ml-7 leading-relaxed">
+              <p className="text-sm text-text-secondary mt-0.5 ml-[26px] leading-relaxed">
                 {step.summary}
               </p>
               {step.files && step.files.length > 0 && (
-                <div className="ml-7 mt-1 flex flex-wrap gap-1">
+                <div className="ml-[26px] mt-1 flex flex-wrap gap-1 overflow-hidden">
                   {step.files.map((f) => (
-                    <span key={f} className="text-[9px] px-1.5 py-0.5 rounded bg-surface-2/60 text-text-tertiary font-mono truncate max-w-[180px]">
+                    <span key={f} className="text-sm px-1 py-px rounded bg-surface-2/50 text-text-tertiary font-mono truncate max-w-[200px]">
                       {f.split("/").pop()}
                     </span>
                   ))}
                 </div>
               )}
               {step.dataOut && (
-                <div className="ml-7 mt-1 flex items-center gap-1 text-[10px] text-accent/70">
-                  <ArrowRight size={10} />
-                  <span>{step.dataOut}</span>
+                <div className="ml-[26px] mt-1 flex items-center gap-1 text-sm text-text-tertiary">
+                  <ArrowRight size={9} className="shrink-0" />
+                  <span className="truncate">{step.dataOut}</span>
                 </div>
               )}
             </div>
@@ -440,7 +451,7 @@ function MessageBubble({ message, fileIndex, onFileClick, modules, isStreaming, 
       <ExplorationSection toolCalls={toolCalls} isLive={!!pendingToolCalls && isStreaming} />
 
       {displayContent && (
-        <div className="chat-markdown text-sm text-foreground/90 leading-relaxed">
+        <div className="chat-markdown text-sm text-foreground leading-relaxed">
           <Markdown
             components={{
               code({ className, children, ...props }) {
@@ -454,21 +465,21 @@ function MessageBubble({ message, fileIndex, onFileClick, modules, isStreaming, 
                       <div className="flex items-center px-3 py-1.5 bg-surface-2/50 border-b border-border">
                         {fileEntry ? (
                           <button onClick={() => onFileClick(lang, fileEntry.moduleId, fileEntry.category)}
-                            className="flex items-center gap-1.5 text-[11px] text-accent hover:text-accent/80 transition-colors">
+                            className="flex items-center gap-1.5 text-sm text-accent hover:text-accent/80 transition-colors">
                             <FileText size={14} />{lang}
                           </button>
                         ) : (
-                          <span className="text-[11px] text-text-tertiary">{lang || "code"}</span>
+                          <span className="text-sm text-text-tertiary">{lang || "code"}</span>
                         )}
                       </div>
-                      <pre className="px-3 py-2 overflow-x-auto text-[11px] leading-relaxed font-mono text-foreground/80">
-                        <code>{children}</code>
+                      <pre className="px-3 py-2 overflow-x-hidden text-sm leading-relaxed font-mono text-foreground/80">
+                        <code className="break-all whitespace-pre-wrap">{children}</code>
                       </pre>
                     </div>
                   );
                 }
                 return (
-                  <code className="px-1 py-0.5 rounded bg-surface-2 text-[12px] font-mono" {...props}>
+                  <code className="px-1 py-0.5 rounded bg-surface-2 text-sm font-mono" {...props}>
                     {children}
                   </code>
                 );
@@ -477,9 +488,9 @@ function MessageBubble({ message, fileIndex, onFileClick, modules, isStreaming, 
               ul({ children }) { return <ul className="mb-2 ml-4 list-disc space-y-1">{children}</ul>; },
               ol({ children }) { return <ol className="mb-2 ml-4 list-decimal space-y-1">{children}</ol>; },
               li({ children }) { return <li className="pl-0.5">{children}</li>; },
-              h1({ children }) { return <h3 className="text-sm font-semibold mt-3 mb-1">{children}</h3>; },
-              h2({ children }) { return <h3 className="text-sm font-semibold mt-3 mb-1">{children}</h3>; },
-              h3({ children }) { return <h4 className="text-[13px] font-semibold mt-2 mb-1">{children}</h4>; },
+              h1({ children }) { return <h3 className="text-base font-semibold mt-3 mb-1">{children}</h3>; },
+              h2({ children }) { return <h3 className="text-base font-semibold mt-3 mb-1">{children}</h3>; },
+              h3({ children }) { return <h4 className="text-sm font-semibold mt-2 mb-1">{children}</h4>; },
               strong({ children }) { return <strong className="font-semibold text-foreground">{children}</strong>; },
               a({ href, children }) { return <a href={href} className="text-accent hover:underline" target="_blank" rel="noreferrer">{children}</a>; },
               blockquote({ children }) { return <blockquote className="border-l-2 border-accent/30 pl-3 my-2 text-text-secondary italic">{children}</blockquote>; },

@@ -39,11 +39,11 @@ export const ArchNode = memo(function ArchNode({
     <>
       <Handle type="target" position={Position.Top} className="!bg-transparent !border-0 !w-2 !h-2" />
       <div
-        className={`relative rounded-lg px-3 py-2 bg-surface-1 border${sibling ? "" : " border-border"}${highlighted ? " node-chat-highlight" : ""}${traceActive ? " node-trace-active" : ""}${hoveredFiles ? " node-trace-step-hovered" : ""}${marchingAnts ? " node-landing-glow" : ""}`}
+        className={`relative rounded-lg px-3 py-2 bg-surface-1 border${sibling ? "" : " border-border"}${hoveredFiles ? " node-trace-step-hovered" : ""}${marchingAnts ? " node-landing-glow" : ""}`}
         style={{
           width: 260,
           opacity: dimmed ? 0.5 : sibling ? 0.72 : 1,
-          borderColor: sibling ? colors.border + "40" : traceActive ? colors.border : undefined,
+          borderColor: sibling ? colors.border + "40" : undefined,
           "--glow-color": colors.border,
         } as React.CSSProperties}
       >
@@ -51,8 +51,7 @@ export const ArchNode = memo(function ArchNode({
         {/* Trace step badge */}
         {traceStepIndex != null && (
           <div
-            className="absolute -top-2.5 -left-2.5 w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold z-10"
-            style={{ backgroundColor: colors.border, color: colors.bg }}
+            className="absolute -top-2.5 -left-2.5 w-5 h-5 rounded-full bg-surface-2 border border-border flex items-center justify-center text-[9px] font-medium text-text-secondary z-10"
           >
             {traceStepIndex + 1}
           </div>
@@ -85,8 +84,8 @@ export const ArchNode = memo(function ArchNode({
                       <div
                         key={f}
                         title={f}
-                        className={`flex items-center gap-1.5 text-[9px] font-mono truncate rounded-sm transition-colors ${isHighlighted ? "bg-accent/20 px-1 -mx-1" : ""}`}
-                        style={{ color: isHighlighted ? "var(--accent)" : colors.border }}
+                        className="flex items-center gap-1.5 text-[9px] font-mono truncate rounded-sm transition-colors"
+                        style={{ color: colors.border }}
                       >
                         <FileCode size={10} className="shrink-0 opacity-70" />
                         {display}
