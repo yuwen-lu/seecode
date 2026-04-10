@@ -72,9 +72,7 @@ export function main() { return helper(); }
     expect(result.dependencyEdges).toHaveLength(1);
     expect(result.dependencyEdges[0].fromFile).toBe("src/main.ts");
     expect(result.dependencyEdges[0].toFile).toBe("src/utils.ts");
-    // Note: importedNames is empty due to the TS import extraction bug
-    // (named import identifiers are not parsed — see typescript.test.ts)
-    expect(result.dependencyEdges[0].importedNames).toEqual([]);
+    expect(result.dependencyEdges[0].importedNames).toContain("helper");
   });
 
   it("resolves index imports", () => {

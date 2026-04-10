@@ -12,7 +12,7 @@ interface LLMAnalysisResult {
   traces: DataTrace[];
 }
 
-export { buildStructureSummary, buildPrompt, parseResponse };
+export { buildStructureSummary, buildPrompt, parseResponse, enrichModulesWithFiles };
 
 /**
  * Streaming version — yields text chunks as they arrive, then returns the final parsed result.
@@ -169,14 +169,16 @@ function enrichModulesWithFiles(
   for (const ef of extraction.files) {
     const symbols = new Set<string>();
     for (const cls of ef.classes) {
-      symbols.add(cls.name.toLowerCase());
-      for (const m of cls.methods) symbols.add(m.name.toLowerCase());
+      if (cls.name) symbols.add(cls.name.toLowerCase());
+      for (const m of cls.methods) {
+        if (m.name) symbols.add(m.name.toLowerCase());
+      }
     }
     for (const fn of ef.functions) {
-      symbols.add(fn.name.toLowerCase());
+      if (fn.name) symbols.add(fn.name.toLowerCase());
     }
     for (const exp of ef.exports) {
-      symbols.add(exp.toLowerCase());
+      if (exp) symbols.add(exp.toLowerCase());
     }
     fileSymbols.set(ef.filePath, symbols);
   }
@@ -197,28 +199,31 @@ function enrichModulesWithFiles(
   for (const mod of modules) {
     // If the LLM already provided valid files, keep them but still add line counts
     if (mod.files && mod.files.length > 0) {
-      // Verify these files actually exist in source
-      const validFiles = mod.files.filter(
-        (f) => sourceFiles.some((sf) => sf.relativePath === f || sf.relativePath.endsWith(f))
-      );
-      if (validFiles.length > 0) {
-        mod.files = validFiles;
-        for (const f of validFiles) assignedFiles.add(f);
+      const resolvedFiles: string[] = [];
+      for (const f of mod.files) {
+        const match = sourceFiles.find(
+          (sf) => sf.relativePath === f || sf.relativePath.endsWith("/" + f),
+        );
+        if (match) resolvedFiles.push(match.relativePath);
+      }
+      if (resolvedFiles.length > 0) {
+        mod.files = resolvedFiles;
+        for (const f of resolvedFiles) assignedFiles.add(f);
         if (!mod.lineCount) {
-          mod.lineCount = validFiles.reduce((sum, f) => sum + (fileLineCounts.get(f) ?? 0), 0);
+          mod.lineCount = resolvedFiles.reduce((sum, f) => sum + (fileLineCounts.get(f) ?? 0), 0);
         }
         continue;
       }
     }
 
-    // Match by symbol overlap: check module name, keyTypes, keyMethods against file symbols
     const searchTerms = new Set<string>();
-    searchTerms.add(mod.name.toLowerCase());
-    searchTerms.add(mod.id.toLowerCase().replace(/-/g, ""));
-    for (const t of mod.keyTypes) searchTerms.add(t.toLowerCase());
+    if (mod.name) searchTerms.add(mod.name.toLowerCase());
+    if (mod.id) searchTerms.add(mod.id.toLowerCase().replace(/-/g, ""));
+    for (const t of mod.keyTypes) {
+      if (t) searchTerms.add(t.toLowerCase());
+    }
     for (const m of mod.keyMethods) {
-      // Strip parens: "foo()" -> "foo"
-      searchTerms.add(m.replace(/\(.*\)/, "").toLowerCase());
+      if (m) searchTerms.add(m.replace(/\(.*\)/, "").toLowerCase());
     }
 
     const matchedFiles: string[] = [];
@@ -262,7 +267,7 @@ function enrichModulesWithFiles(
 }
 
 function parseResponse(text: string): LLMAnalysisResult {
-  const jsonMatch = text.match(/```json\n([\s\S]*?)```/);
+  const jsonMatch = text.match(/```json\r?\n([\s\S]*?)```/);
   if (!jsonMatch) {
     throw new Error("LLM response did not contain a valid JSON block");
   }
@@ -274,16 +279,22 @@ function parseResponse(text: string): LLMAnalysisResult {
     throw new Error(`Failed to parse LLM JSON response: ${err instanceof Error ? err.message : err}`);
   }
 
-  const modules = (parsed.modules ?? []).map((m) => ({
-    ...m,
-    keyTypes: m.keyTypes ?? [],
-    keyMethods: m.keyMethods ?? [],
-    files: m.files ?? [],
-  }));
+  const modules = (parsed.modules ?? [])
+    .filter((m) => m && typeof m === "object")
+    .map((m, i) => ({
+      ...m,
+      id: m.id ?? m.name ?? `module-${i}`,
+      name: m.name ?? m.id ?? `Module ${i}`,
+      keyTypes: (m.keyTypes ?? []).filter((t): t is string => typeof t === "string"),
+      keyMethods: (m.keyMethods ?? []).filter((t): t is string => typeof t === "string"),
+      files: (m.files ?? []).filter((f): f is string => typeof f === "string"),
+    }));
 
   return {
     modules,
-    edges: parsed.edges ?? [],
+    edges: (parsed.edges ?? []).filter(
+      (e) => e && typeof e.from === "string" && typeof e.to === "string",
+    ),
     traces: parsed.traces ?? [],
   };
 }

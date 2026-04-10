@@ -102,25 +102,20 @@ class MyClass:
       expect(methodNames).not.toContain("__init__");
       // get_value should be there
       expect(methodNames).toContain("get_value");
-      // BUG PROBE: dunder methods like __str__, __eq__ are filtered by the
-      // `name.startsWith("_") && name !== "__init__"` check.
-      // This test documents the current (potentially buggy) behavior.
-      expect(methodNames).not.toContain("__str__");
-      expect(methodNames).not.toContain("__eq__");
+      expect(methodNames).toContain("__str__");
+      expect(methodNames).toContain("__repr__");
+      expect(methodNames).toContain("__eq__");
     });
   });
 
   describe("class extraction", () => {
-    // BUG: node.childForFieldName("superclasses") returns argument_list "(Animal)".
-    // child(0) is "(" which gets filtered, but code never checks child(1) for the actual name.
-    it("BUG: superclass is not extracted — first child of argument_list is parenthesis", () => {
+    it("extracts class with superclass", () => {
       const result = writeAndExtract(`
 class Dog(Animal):
     def bark(self):
         pass
       `);
-      // BUG: Should be "Animal" but child(0) is "(" which gets filtered
-      expect(result.classes[0].extends).toBeUndefined();
+      expect(result.classes[0].extends).toBe("Animal");
     });
 
     it("extracts self.x properties from __init__", () => {
@@ -236,25 +231,20 @@ This is a docstring at module level
       expect(result.functions).toEqual([]);
     });
 
-    // BUG: Same argument_list parenthesis issue as single inheritance
-    it("BUG: multiple inheritance — superclass not extracted", () => {
+    it("extracts first superclass from multiple inheritance", () => {
       const result = writeAndExtract(`
 class MultiChild(Parent1, Parent2, Mixin):
     pass
       `);
-      // BUG: Should be "Parent1" but fails due to same parenthesis issue
-      expect(result.classes[0].extends).toBeUndefined();
+      expect(result.classes[0].extends).toBe("Parent1");
     });
 
-    // BUG: tree-sitter-python uses "typed_default_parameter" for `count: int = 5`,
-    // but extractFunction only handles "typed_parameter" and "default_parameter".
-    it("BUG: typed default parameters are silently dropped", () => {
+    it("extracts typed default parameters", () => {
       const result = writeAndExtract(`
 def process(data: list[str], count: int = 5) -> bool:
     return True
       `);
-      // BUG: Should be ["data", "count"] but typed_default_parameter is unhandled
-      expect(result.functions[0].params).toEqual(["data"]);
+      expect(result.functions[0].params).toEqual(["data", "count"]);
     });
   });
 });

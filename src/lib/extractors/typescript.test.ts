@@ -134,32 +134,24 @@ class Empty {}
   });
 
   describe("import extraction", () => {
-    // BUG: findChildByTypes(node, ["import_clause", "named_imports"]) finds
-    // import_clause (the parent wrapper) instead of named_imports (nested inside it).
-    // Then it iterates import_clause's children looking for import_specifier nodes,
-    // but import_clause contains named_imports, not import_specifier directly.
-    // Result: named import identifiers are silently lost.
-    it("BUG: named imports are not extracted — names array is empty", () => {
+    it("extracts named imports", () => {
       const result = writeAndExtract(`
 import { useState, useEffect } from "react";
       `);
       expect(result.imports).toHaveLength(1);
       expect(result.imports[0].source).toBe("react");
-      // BUG: Should contain ["useState", "useEffect"] but returns []
-      expect(result.imports[0].names).toEqual([]);
+      expect(result.imports[0].names).toContain("useState");
+      expect(result.imports[0].names).toContain("useEffect");
     });
 
-    // BUG: findChildByTypes(node, ["identifier"]) searches direct children of
-    // import_statement, but for `import React from "react"`, the identifier
-    // "React" is inside import_clause, not a direct child of import_statement.
-    it("BUG: default import names are not extracted", () => {
+    it("extracts default imports", () => {
       const result = writeAndExtract(`
 import React from "react";
       `);
       expect(result.imports).toHaveLength(1);
       expect(result.imports[0].source).toBe("react");
-      // BUG: Should contain ["React"] with isDefault: true
-      expect(result.imports[0].names).toEqual([]);
+      expect(result.imports[0].names).toContain("React");
+      expect(result.imports[0].isDefault).toBe(true);
     });
 
     it("handles side-effect-only imports", () => {
@@ -170,13 +162,12 @@ import "./styles.css";
       expect(result.imports[0].source).toBe("./styles.css");
     });
 
-    it("BUG: aliased import names are not extracted", () => {
+    it("extracts aliased imports", () => {
       const result = writeAndExtract(`
 import { Component as Comp } from "./component";
       `);
       expect(result.imports).toHaveLength(1);
-      // BUG: Same root cause as named imports — names are empty
-      expect(result.imports[0].names).toEqual([]);
+      expect(result.imports[0].names.length).toBeGreaterThan(0);
     });
   });
 

@@ -62,12 +62,15 @@ function extractClass(node: Parser.SyntaxNode): ExtractedClass | null {
   const properties: string[] = [];
   let extendsName: string | undefined;
 
-  // Superclass
+  // Superclass — argument_list children include punctuation, skip them
   const superclasses = node.childForFieldName("superclasses");
-  if (superclasses && superclasses.childCount > 0) {
-    const first = superclasses.child(0);
-    if (first && first.type !== "(" && first.type !== ")") {
-      extendsName = first.text;
+  if (superclasses) {
+    for (let k = 0; k < superclasses.childCount; k++) {
+      const arg = superclasses.child(k)!;
+      if (arg.type !== "(" && arg.type !== ")" && arg.type !== ",") {
+        extendsName = arg.text;
+        break;
+      }
     }
   }
 
@@ -99,7 +102,7 @@ function extractClass(node: Parser.SyntaxNode): ExtractedClass | null {
 
 function extractFunction(node: Parser.SyntaxNode): ExtractedFunction | null {
   const name = node.childForFieldName("name")?.text;
-  if (!name || name.startsWith("_") && name !== "__init__") return null;
+  if (!name || (name.startsWith("_") && !name.startsWith("__"))) return null;
 
   const paramsNode = node.childForFieldName("parameters");
   const params: string[] = [];
@@ -108,7 +111,7 @@ function extractFunction(node: Parser.SyntaxNode): ExtractedFunction | null {
       const p = paramsNode.child(i)!;
       if (p.type === "identifier" && p.text !== "self" && p.text !== "cls") {
         params.push(p.text);
-      } else if (p.type === "typed_parameter" || p.type === "default_parameter") {
+      } else if (p.type === "typed_parameter" || p.type === "default_parameter" || p.type === "typed_default_parameter") {
         const pName = p.child(0)?.text;
         if (pName && pName !== "self" && pName !== "cls") params.push(pName);
       }

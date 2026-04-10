@@ -72,10 +72,8 @@ func (d *DB) Query(sql string) error {
     });
   });
 
-  describe("method declared before struct — ordering bug", () => {
-    it("loses methods when method appears before struct declaration", () => {
-      // The extractor iterates top-level nodes in order.
-      // If a method_declaration appears BEFORE the struct, structMap won't have the entry yet.
+  describe("method declared before struct", () => {
+    it("attaches methods even when they appear before the struct declaration", () => {
       const result = writeAndExtract(`
 package main
 
@@ -85,10 +83,9 @@ type Handler struct {
 	prefix string
 }
       `);
-      // BUG: The method is processed before the struct exists in structMap,
-      // so it's silently dropped.
       expect(result.classes[0].name).toBe("Handler");
-      expect(result.classes[0].methods).toHaveLength(0); // method was lost
+      expect(result.classes[0].methods).toHaveLength(1);
+      expect(result.classes[0].methods[0].name).toBe("ServeHTTP");
     });
   });
 
@@ -129,9 +126,7 @@ func _helper() {}
   });
 
   describe("interface extraction", () => {
-    // BUG: extractInterface looks for child type "method_spec" but tree-sitter-go
-    // v0.25 uses "method_elem". Methods are silently dropped.
-    it("BUG: interface methods not extracted — wrong node type name", () => {
+    it("extracts interface methods", () => {
       const result = writeAndExtract(`
 package main
 
@@ -143,9 +138,7 @@ type Reader interface {
       expect(result.classes).toHaveLength(1);
       expect(result.classes[0].name).toBe("Reader");
       expect(result.classes[0].implements).toEqual(["interface"]);
-      // BUG: Should be ["Read", "Close"] but the code checks for "method_spec"
-      // while tree-sitter-go produces "method_elem" nodes
-      expect(result.classes[0].methods).toEqual([]);
+      expect(result.classes[0].methods.map((m) => m.name)).toEqual(["Read", "Close"]);
     });
   });
 

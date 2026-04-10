@@ -136,18 +136,14 @@ async fn do_work() {
       expect(result.functions[0].isAsync).toBe(true);
     });
 
-    it("may miss pub(crate) async fn", () => {
-      // nodeContains checks: startsWith("async ") || startsWith("pub async ")
-      // "pub(crate) async fn" starts with "pub(crate)" — neither pattern matches
+    it("detects pub(crate) async fn", () => {
       const result = writeAndExtract(`
 pub(crate) async fn internal_fetch() -> String {
     String::new()
 }
       `);
-      // BUG: This will NOT detect async because "pub(crate) async fn" doesn't
-      // start with "async " or "pub async "
       expect(result.functions[0].name).toBe("internal_fetch");
-      expect(result.functions[0].isAsync).toBe(false); // documents the bug
+      expect(result.functions[0].isAsync).toBe(true);
     });
   });
 

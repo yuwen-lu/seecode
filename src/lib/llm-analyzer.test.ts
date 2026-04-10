@@ -80,11 +80,10 @@ describe("parseResponse", () => {
   });
 
   describe("regex edge cases — potential issues", () => {
-    it("fails on \\r\\n line endings (Windows-style)", () => {
-      // The regex requires literal \n after ```json
+    it("handles \\r\\n line endings (Windows-style)", () => {
       const text = "```json\r\n{\"modules\":[], \"edges\":[], \"traces\":[]}\r\n```";
-      // The regex is /```json\n([\s\S]*?)```/ — \r\n doesn't match \n alone
-      expect(() => parseResponse(text)).toThrow("did not contain a valid JSON block");
+      const result = parseResponse(text);
+      expect(result.modules).toEqual([]);
     });
 
     it("extracts first JSON block when multiple are present", () => {
