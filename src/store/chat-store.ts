@@ -1,5 +1,6 @@
 import { create } from "zustand";
-import type { ChatMessage, CanvasContext } from "@/types/chat";
+import type { ChatMessage, CanvasContext, ToolCallInfo } from "@/types/chat";
+import type { DynamicTrace } from "@/types/graph";
 
 const STORAGE_PREFIX = "seecode:chat:";
 const MAX_PERSISTED = 50;
@@ -13,10 +14,14 @@ interface ChatStore {
   repoKey: string | null;
   isOpen: boolean;
 
+  activeTrace: DynamicTrace | null;
+  hoveredStepIndex: number | null;
+  pendingToolCalls: ToolCallInfo[];
+
   setRepoKey: (key: string) => void;
   addMessage: (msg: ChatMessage) => void;
   updateLastAssistant: (content: string) => void;
-  finalizeLastAssistant: (fileReferences?: ChatMessage["fileReferences"]) => void;
+  finalizeLastAssistant: (fileReferences?: ChatMessage["fileReferences"], trace?: DynamicTrace, toolCalls?: ToolCallInfo[]) => void;
   setStreaming: (v: boolean) => void;
   setHighlights: (ids: Set<string>) => void;
   clearHighlights: () => void;
@@ -25,6 +30,11 @@ interface ChatStore {
   loadFromStorage: (repoKey: string) => void;
   setOpen: (v: boolean) => void;
   toggleOpen: () => void;
+
+  setActiveTrace: (trace: DynamicTrace | null) => void;
+  setHoveredStep: (index: number | null) => void;
+  addPendingToolCall: (tc: ToolCallInfo) => void;
+  clearPendingToolCalls: () => void;
 
   apiHistory: () => Pick<ChatMessage, "role" | "content">[];
 }
@@ -36,6 +46,9 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   canvasContext: null,
   repoKey: null,
   isOpen: false,
+  activeTrace: null,
+  hoveredStepIndex: null,
+  pendingToolCalls: [],
 
   setRepoKey: (key) => {
     set({ repoKey: key });
@@ -61,12 +74,12 @@ export const useChatStore = create<ChatStore>((set, get) => ({
     });
   },
 
-  finalizeLastAssistant: (fileReferences) => {
+  finalizeLastAssistant: (fileReferences, trace, toolCalls) => {
     set((s) => {
       const msgs = [...s.messages];
       const last = msgs[msgs.length - 1];
       if (last?.role === "assistant") {
-        msgs[msgs.length - 1] = { ...last, fileReferences };
+        msgs[msgs.length - 1] = { ...last, fileReferences, trace, toolCalls };
       }
       persist(s.repoKey, msgs);
       return { messages: msgs };
@@ -81,12 +94,18 @@ export const useChatStore = create<ChatStore>((set, get) => ({
   setOpen: (v) => set({ isOpen: v }),
   toggleOpen: () => set((s) => ({ isOpen: !s.isOpen })),
 
+  setActiveTrace: (trace) => set({ activeTrace: trace }),
+  setHoveredStep: (index) => set({ hoveredStepIndex: index }),
+  addPendingToolCall: (tc) =>
+    set((s) => ({ pendingToolCalls: [...s.pendingToolCalls, tc] })),
+  clearPendingToolCalls: () => set({ pendingToolCalls: [] }),
+
   clearMessages: () => {
     const { repoKey } = get();
     if (repoKey) {
       try { localStorage.removeItem(STORAGE_PREFIX + repoKey); } catch {}
     }
-    set({ messages: [], highlights: new Set() });
+    set({ messages: [], highlights: new Set(), activeTrace: null, hoveredStepIndex: null });
   },
 
   loadFromStorage: (repoKey) => {

@@ -35,6 +35,19 @@ export interface DataTrace {
   path: string[]; // module IDs in order
 }
 
+export interface TraceStep {
+  moduleId: string;
+  summary: string;
+  files?: string[];
+  dataIn?: string;
+  dataOut?: string;
+}
+
+export interface DynamicTrace {
+  name: string;
+  steps: TraceStep[];
+}
+
 export interface ArchGraph {
   repoUrl: string;
   repoName: string;

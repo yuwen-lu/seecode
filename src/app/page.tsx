@@ -55,6 +55,8 @@ export default function Home() {
   const chatHighlights = useChatStore((s) => s.highlights);
   const setCanvasContext = useChatStore((s) => s.setCanvasContext);
   const setChatRepoKey = useChatStore((s) => s.setRepoKey);
+  const dynamicTrace = useChatStore((s) => s.activeTrace);
+  const hoveredStepIndex = useChatStore((s) => s.hoveredStepIndex);
   const selectedNodeId = highlightOverride
     ?? (selection
       ? selection.kind === "module"
@@ -294,6 +296,8 @@ export default function Home() {
             <GraphCanvas
               graph={graph}
               activeTrace={activeTrace}
+              dynamicTrace={dynamicTrace}
+              hoveredStepIndex={hoveredStepIndex}
               onSelect={handleSelect}
               selectedNodeId={selectedNodeId}
               panelExpandedCategory={panelExpandedCategory}
