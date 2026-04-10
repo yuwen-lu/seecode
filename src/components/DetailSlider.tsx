@@ -22,8 +22,13 @@ export function DetailSlider({ level, locked, onLevelChange, onLockedChange, pos
 
   return (
     <div className={`absolute bottom-4 ${position === "bottom-left" ? "left-4" : "right-4"} z-10 flex flex-col items-center gap-1.5 animate-slider-enter`}>
-      {/* Label */}
-      <span className="text-[9px] text-text-tertiary uppercase tracking-wider select-none text-center max-w-[30px] leading-tight">Canvas zoom</span>
+      {/* Canvas zoom title */}
+      <span className="text-[9px] text-text-tertiary uppercase tracking-wider select-none text-center max-w-[36px] leading-tight">Canvas zoom</span>
+
+      {/* Current zoom level label */}
+      <span className="text-[9px] text-text-tertiary text-center leading-tight select-none">
+        {LEVELS[activeIndex]?.label}
+      </span>
 
       {/* Vertical slider track */}
       <div className="flex flex-col items-center bg-surface-1 border border-border rounded-full p-1.5 gap-0.5">
@@ -49,29 +54,32 @@ export function DetailSlider({ level, locked, onLevelChange, onLockedChange, pos
             <div className={`absolute ${position === "bottom-left" ? "left-full ml-2" : "right-full mr-2"} hidden group-hover:flex items-center whitespace-nowrap pointer-events-none`}>
               <span className="text-[11px] text-text-secondary bg-surface-1 border border-border rounded px-2 py-1 shadow-lg">
                 {l.label}
-                <span className="text-text-tertiary"> — {l.short}</span>
+                <span className="text-text-tertiary"> · {l.short}</span>
               </span>
             </div>
           </button>
         ))}
       </div>
 
-      {/* Current level label */}
-      <span className="text-[9px] text-text-tertiary text-center leading-tight select-none">
-        {LEVELS[activeIndex]?.label}
-      </span>
-
-      {/* Lock toggle */}
+      {/* Lock label + toggle */}
+      <span className="text-[9px] text-text-tertiary text-center leading-tight select-none">Lock</span>
       <button
         onClick={() => onLockedChange(!locked)}
-        className={`w-[36px] h-[36px] flex items-center justify-center rounded-full border transition-colors cursor-pointer ${
+        className={`group relative w-[36px] h-[36px] flex items-center justify-center rounded-full border transition-colors cursor-pointer ${
           locked
             ? "bg-surface-2 border-border-strong text-foreground"
             : "bg-surface-1 border-border text-text-tertiary hover:text-text-secondary"
         }`}
-        title="Lock zoom level"
+        aria-label="Lock zoom level"
+        aria-pressed={locked}
       >
         {locked ? <Lock size={14} /> : <Unlock size={14} />}
+        <div className={`absolute ${position === "bottom-left" ? "left-full ml-2" : "right-full mr-2"} hidden group-hover:flex items-center whitespace-nowrap pointer-events-none`}>
+          <span className="text-[11px] text-text-secondary bg-surface-1 border border-border rounded px-2 py-1 shadow-lg">
+            {locked ? "Locked" : "Unlocked"}
+            <span className="text-text-tertiary"> · {locked ? "Detail stays fixed while zooming" : "Detail follows zoom level"}</span>
+          </span>
+        </div>
       </button>
     </div>
   );
