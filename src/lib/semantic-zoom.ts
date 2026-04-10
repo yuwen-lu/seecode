@@ -12,8 +12,8 @@ export function getZoomLevel(zoom: number): ZoomLevel {
   return "detailed";
 }
 
-const GROUP_NODE_WIDTH = 260;
-const GROUP_NODE_HEIGHT = 120;
+const GROUP_NODE_WIDTH = 400;
+const GROUP_NODE_HEIGHT = 180;
 const NODE_WIDTH = 220;
 const NODE_HEIGHT = 140;
 

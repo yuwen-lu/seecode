@@ -56,8 +56,11 @@ function GraphCanvasInner({
   const [locked, setLocked] = useState(true); // Default locked since we use double-click now
   const prevZoomLevel = useRef<ZoomLevel>("collapsed");
 
-  // Track which categories are expanded (double-click to toggle)
+  // Track which categories are expanded (double-click group to drill down)
   const [expandedCategories, setExpandedCategories] = useState<Set<NodeCategory>>(new Set());
+
+  // Track which individual modules are expanded to detail view (double-click module to drill down)
+  const [detailedModules, setDetailedModules] = useState<Set<string>>(new Set());
 
   // Undo/redo history for expandedCategories
   const undoStack = useRef<Set<NodeCategory>[]>([]);
@@ -74,6 +77,11 @@ function GraphCanvasInner({
 
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
 
+  // Marching ants highlight after group expansion
+  const [marchingAntNodes, setMarchingAntNodes] = useState<Set<string>>(new Set());
+  const marchStartTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const marchEndTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const clickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [animClass, setAnimClass] = useState<"" | "react-flow--seeding" | "react-flow--morphing" | "react-flow--animating" | "react-flow--entering">("react-flow--entering");
   const animTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -85,26 +93,28 @@ function GraphCanvasInner({
       if (clickTimer.current) clearTimeout(clickTimer.current);
       if (animTimer.current) clearTimeout(animTimer.current);
       if (fitViewTimer.current) clearTimeout(fitViewTimer.current);
+      if (marchStartTimer.current) clearTimeout(marchStartTimer.current);
+      if (marchEndTimer.current) clearTimeout(marchEndTimer.current);
     };
   }, []);
 
   const triggerAnimation = useCallback(() => {
     setAnimClass("react-flow--animating");
     if (animTimer.current) clearTimeout(animTimer.current);
-    animTimer.current = setTimeout(() => setAnimClass(""), 600);
+    animTimer.current = setTimeout(() => setAnimClass(""), 650);
   }, []);
 
-  // Debounced fitView — delayed so morph animation plays first
+  // Debounced fitView — delayed so morph animation mostly settles first
   // Pass nodeIds to scope the fit to specific nodes, or omit to fit all
   const scheduleFitView = useCallback((nodeIds?: string[]) => {
     if (fitViewTimer.current) clearTimeout(fitViewTimer.current);
     fitViewTimer.current = setTimeout(() => {
       if (nodeIds && nodeIds.length > 0) {
-        fitView({ padding: 0.15, duration: 350, nodes: nodeIds.map((id) => ({ id })) });
+        fitView({ padding: 0.3, duration: 700, maxZoom: 1.5, nodes: nodeIds.map((id) => ({ id })) });
       } else {
-        fitView({ padding: 0.12, duration: 350 });
+        fitView({ padding: 0.18, duration: 650 });
       }
-    }, 300);
+    }, 400);
   }, [fitView]);
 
   // All unique categories in the graph
@@ -262,7 +272,7 @@ function GraphCanvasInner({
         setNodes(layout.nodes);
         // Clear morphing class after transition completes
         if (animTimer.current) clearTimeout(animTimer.current);
-        animTimer.current = setTimeout(() => setAnimClass(""), 600);
+        animTimer.current = setTimeout(() => setAnimClass(""), 650);
       });
     });
 
@@ -346,7 +356,7 @@ function GraphCanvasInner({
     [graph.modules, onSelect]
   );
 
-  // Double-click: only drill down (never collapse, never close panel)
+  // Double-click: drill down one level (never collapse, never close panel)
   const onNodeDoubleClick = useCallback(
     (_: React.MouseEvent, node: Node) => {
       if (clickTimer.current) {
@@ -355,7 +365,7 @@ function GraphCanvasInner({
       }
 
       if (node.type === "groupNode") {
-        // Expand this group (drill down)
+        // Expand this group (drill down to module level)
         const category = (node.data as GroupNodeData).category as NodeCategory;
         if (!expandedCategories.has(category)) {
           const next = new Set(expandedCategories);
@@ -363,16 +373,29 @@ function GraphCanvasInner({
           triggerAnimation();
           pushExpansion(next);
           scheduleFitView();
+
+          // Landing glow on the revealed nodes after morph + zoom settle
+          const memberIds = graph.modules
+            .filter((m) => m.category === category)
+            .map((m) => m.id);
+          if (marchStartTimer.current) clearTimeout(marchStartTimer.current);
+          if (marchEndTimer.current) clearTimeout(marchEndTimer.current);
+          setMarchingAntNodes(new Set());
+          marchStartTimer.current = setTimeout(() => {
+            setMarchingAntNodes(new Set(memberIds));
+            marchEndTimer.current = setTimeout(() => {
+              setMarchingAntNodes(new Set());
+            }, 3000);
+          }, 950);
         }
       } else {
-        // Double-click module → open module panel
-        const mod = graph.modules.find((m) => m.id === node.id);
-        if (mod) {
-          onSelect({ kind: "module", module: mod });
+        // Expand this module to detail level (local, card expands in place)
+        if (!detailedModules.has(node.id)) {
+          setDetailedModules((prev) => new Set(prev).add(node.id));
         }
       }
     },
-    [graph.modules, expandedCategories, onSelect, triggerAnimation, pushExpansion, scheduleFitView]
+    [expandedCategories, detailedModules, triggerAnimation, pushExpansion, scheduleFitView]
   );
 
   const onPaneClick = useCallback(() => {
@@ -391,6 +414,7 @@ function GraphCanvasInner({
   function handleLevelChange(level: ZoomLevel) {
     prevZoomLevel.current = level;
     setZoomLevel(level);
+    setDetailedModules(new Set());
     // When switching to system view, clear all expansions
     if (level === "collapsed") {
       setExpandedCategories(new Set());
@@ -423,38 +447,50 @@ function GraphCanvasInner({
     <>
       <ReactFlow
         className={animClass || undefined}
-        nodes={nodes.map((n) => {
-          // Match by exact ID, group membership, or category when a group was expanded
-          const selectedCategory = selectedNodeId?.startsWith("group-")
+        nodes={(() => {
+          const selectedGroupCategory = selectedNodeId?.startsWith("group-")
             ? selectedNodeId.slice(6) as NodeCategory
             : null;
-          const isSelected = n.id === selectedNodeId ||
-            // Group node containing the selected module
-            (n.type === "groupNode" && selectedNodeId
-              ? ((n.data as { members?: ArchModule[] })?.members ?? []).some((m) => m.id === selectedNodeId)
-              : false) ||
-            // Individual node belonging to the selected group's category
-            (selectedCategory && n.type !== "groupNode"
-              ? graph.modules.find((m) => m.id === n.id)?.category === selectedCategory
-              : false);
-          const dimmedBySelection = !!selectedNodeId && !isSelected;
-          const dimmedByTrace = !!traceNodeIds && !traceNodeIds.has(n.id);
-          return {
-            ...n,
-            selected: isSelected,
-            data: {
-              ...n.data,
-              dimmed: dimmedBySelection || dimmedByTrace,
-              // Individual nodes always show at least compact; group nodes stay collapsed
-              zoomLevel: n.type === "groupNode" ? zoomLevel : (zoomLevel === "collapsed" ? "compact" : zoomLevel),
-              isDark,
-              highlighted: chatHighlights?.has(n.id) ||
-                (n.type === "groupNode" && chatHighlights
-                  ? ((n.data as { members?: ArchModule[] })?.members ?? []).some((m) => chatHighlights.has(m.id))
-                  : false),
-            },
-          };
-        })}
+          const selectedModuleCategory = !selectedGroupCategory && selectedNodeId
+            ? graph.modules.find((m) => m.id === selectedNodeId)?.category ?? null
+            : null;
+
+          return nodes.map((n) => {
+            const isSelected = n.id === selectedNodeId ||
+              (n.type === "groupNode" && selectedNodeId
+                ? ((n.data as { members?: ArchModule[] })?.members ?? []).some((m) => m.id === selectedNodeId)
+                : false) ||
+              (selectedGroupCategory && n.type !== "groupNode"
+                ? graph.modules.find((m) => m.id === n.id)?.category === selectedGroupCategory
+                : false);
+            const dimmedBySelection = !!selectedNodeId && !isSelected;
+            const dimmedByTrace = !!traceNodeIds && !traceNodeIds.has(n.id);
+            const isSibling = !isSelected && n.type !== "groupNode" && (
+              (selectedGroupCategory && graph.modules.find((m) => m.id === n.id)?.category === selectedGroupCategory) ||
+              (selectedModuleCategory && graph.modules.find((m) => m.id === n.id)?.category === selectedModuleCategory)
+            );
+            return {
+              ...n,
+              selected: isSelected,
+              data: {
+                ...n.data,
+                dimmed: dimmedByTrace || (dimmedBySelection && !isSibling),
+                sibling: isSibling && !dimmedByTrace,
+                zoomLevel: n.type === "groupNode"
+                  ? zoomLevel
+                  : detailedModules.has(n.id)
+                    ? "detailed"
+                    : (zoomLevel === "collapsed" ? "compact" : zoomLevel),
+                isDark,
+                highlighted: chatHighlights?.has(n.id) ||
+                  (n.type === "groupNode" && chatHighlights
+                    ? ((n.data as { members?: ArchModule[] })?.members ?? []).some((m) => chatHighlights.has(m.id))
+                    : false),
+                marchingAnts: marchingAntNodes.has(n.id),
+              },
+            };
+          });
+        })()}
         edges={edges.map((e) => {
           if (!selectedNodeId && !traceNodeIds) return e;
           if (selectedNodeId) {

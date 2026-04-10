@@ -31,34 +31,34 @@ export const GroupNode = memo(function GroupNode({
     <>
       <Handle type="target" position={Position.Top} className="!bg-transparent !border-0 !w-3 !h-3" />
       <div
-        className={`rounded-xl px-4 py-3 bg-surface-1 border border-border${data.highlighted ? " node-chat-highlight" : ""}`}
+        className={`rounded-xl px-5 py-4 bg-surface-1 border border-border${data.highlighted ? " node-chat-highlight" : ""}`}
         style={{
-          width: 280,
+          width: 400,
           opacity: data.dimmed ? 0.5 : 1,
         }}
       >
         {/* Category accent + group name */}
-        <div className="flex items-center gap-1.5 mb-0.5">
-          <div className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: colors.border }} />
-          <span className="text-[10px] font-medium uppercase tracking-wide" style={{ color: colors.border }}>
+        <div className="flex items-center gap-2 mb-1">
+          <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: colors.border }} />
+          <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: colors.border }}>
             {CATEGORY_LABELS[data.category]}
           </span>
         </div>
-        <div className="text-sm font-bold leading-snug mb-1.5 text-foreground">
+        <div className="text-xl font-bold leading-snug mb-2.5 text-foreground">
           {data.label}
         </div>
 
         {/* Member list */}
-        <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 mb-2">
+        <div className="grid grid-cols-2 gap-x-4 gap-y-1 mb-3">
           {data.members.map((m) => (
-            <span key={m.id} className="text-[10px] leading-snug truncate text-text-secondary">
+            <span key={m.id} className="text-[11px] leading-snug truncate text-text-secondary">
               {m.name}
             </span>
           ))}
         </div>
 
         {/* Stats */}
-        <div className="text-[9px] pt-1.5 text-text-tertiary border-t border-border">
+        <div className="text-[10px] pt-2 text-text-tertiary border-t border-border">
           {data.memberCount} module{data.memberCount !== 1 ? "s" : ""}
           {data.totalLines > 0 ? ` · ${data.totalLines.toLocaleString()} lines` : ""}
         </div>
