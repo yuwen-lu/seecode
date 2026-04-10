@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { ExtractionResult } from "./extractors";
 import type { SourceFile } from "./repo";
-import type { ArchGraph, ArchModule, ArchEdge, DataTrace } from "@/types/graph";
+import type { ArchGraph, ArchModule, ArchEdge } from "@/types/graph";
 import fs from "fs";
 
 const client = new Anthropic();
@@ -9,7 +9,6 @@ const client = new Anthropic();
 interface LLMAnalysisResult {
   modules: ArchModule[];
   edges: ArchEdge[];
-  traces: DataTrace[];
 }
 
 export { buildStructureSummary, buildPrompt, parseResponse };
@@ -26,8 +25,7 @@ export async function analyzeWithLLMStreaming(
   const structureSummary = buildStructureSummary(extraction, sourceFiles);
 
   const stream = await client.messages.stream({
-    // model: "claude-sonnet-4-6",
-    model: "claude-haiku-4-5",
+    model: "claude-sonnet-4-6",
     max_tokens: 20000,
     messages: [
       {
@@ -126,24 +124,26 @@ function buildStructureSummary(
 function buildPrompt(structureSummary: string, repoName: string): string {
   return `You are analyzing the architecture of the GitHub repository "${repoName}".
 
-Below is the extracted code structure. Analyze it and produce a **structured JSON** object describing modules, edges, and data flow traces.
+Below is the extracted code structure. Analyze it and produce a **structured JSON** object describing modules and edges.
 
 Rules for the JSON:
 - Each module should represent a logical component (not every single file — group related files)
 - Assign a category to each module. Choose from: core, api-client, data, visual, utility, config, external, proxy, voice
 - Write a 1-sentence responsibility description
 - List key types (class/struct/interface names) and key methods
+- IMPORTANT: Include a "files" array with the EXACT relative file paths from the code structure above (e.g. "src/lib/cache.ts"). Every source file must belong to exactly one module.
 - Include lineCount if you can estimate it
 - Edges should have a type: "owns" (creates/manages), "depends" (uses), "dataflow" (data passes through), "weak" (optional/loose coupling)
-- Include 1-3 data flow traces showing how a request/operation moves through the system
+
+Each module MUST follow this shape:
+{ "id": "kebab-case-id", "name": "Human Name", "category": "core", "responsibility": "...", "files": ["src/path/to/file.ts", ...], "keyTypes": [...], "keyMethods": [...] }
 
 Respond in EXACTLY this format (no other text):
 
 \`\`\`json
 {
   "modules": [...],
-  "edges": [...],
-  "traces": [...]
+  "edges": [...]
 }
 \`\`\`
 
@@ -199,10 +199,15 @@ function enrichModulesWithFiles(
   for (const mod of modules) {
     // If the LLM already provided valid files, keep them but still add line counts
     if (mod.files && mod.files.length > 0) {
-      // Verify these files actually exist in source
-      const validFiles = mod.files.filter(
-        (f) => sourceFiles.some((sf) => sf.relativePath === f || sf.relativePath.endsWith(f))
-      );
+      // Verify these files actually exist in source (flexible path matching)
+      const validFiles = mod.files
+        .map((f) => {
+          const exact = sourceFiles.find((sf) => sf.relativePath === f);
+          if (exact) return exact.relativePath;
+          const suffix = sourceFiles.find((sf) => sf.relativePath.endsWith(f) || f.endsWith(sf.relativePath));
+          return suffix?.relativePath ?? null;
+        })
+        .filter((f): f is string => f !== null);
       if (validFiles.length > 0) {
         mod.files = validFiles;
         for (const f of validFiles) assignedFiles.add(f);
@@ -269,7 +274,7 @@ function parseResponse(text: string): LLMAnalysisResult {
     throw new Error("LLM response did not contain a valid JSON block");
   }
 
-  let parsed: { modules?: ArchModule[]; edges?: ArchEdge[]; traces?: DataTrace[] };
+  let parsed: { modules?: ArchModule[]; edges?: ArchEdge[] };
   try {
     parsed = JSON.parse(jsonMatch[1].trim());
   } catch (err) {
@@ -292,6 +297,5 @@ function parseResponse(text: string): LLMAnalysisResult {
     edges: (parsed.edges ?? []).filter(
       (e) => e && typeof e.from === "string" && typeof e.to === "string",
     ),
-    traces: parsed.traces ?? [],
   };
 }

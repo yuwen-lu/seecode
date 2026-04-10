@@ -1,12 +1,20 @@
-import type { NodeCategory, ArchModule } from "./graph";
+import type { NodeCategory, ArchModule, DynamicTrace } from "./graph";
 
 export type SelectedModule = Omit<ArchModule, "lineCount">;
+
+export interface ToolCallInfo {
+  tool: string;
+  input: Record<string, unknown>;
+  summary?: string;
+}
 
 export interface ChatMessage {
   id: string;
   role: "user" | "assistant" | "system";
   content: string;
   fileReferences?: FileReference[];
+  toolCalls?: ToolCallInfo[];
+  trace?: DynamicTrace;
   timestamp: number;
 }
 
@@ -44,7 +52,6 @@ export interface CanvasContext {
     files: string[];
   }[];
   zoomLevel: "system" | "module" | "detail";
-  activeTrace: string | null;
   panelDepth: "component" | "module" | "file" | null;
   activeFile: string | null;
 }

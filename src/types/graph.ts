@@ -29,10 +29,17 @@ export interface ArchEdge {
   label?: string;
 }
 
-export interface DataTrace {
+export interface TraceStep {
+  moduleId: string;
+  summary: string;
+  files?: string[];
+  dataIn?: string;
+  dataOut?: string;
+}
+
+export interface DynamicTrace {
   name: string;
-  description: string;
-  path: string[]; // module IDs in order
+  steps: TraceStep[];
 }
 
 export interface ArchGraph {
@@ -42,7 +49,6 @@ export interface ArchGraph {
   analyzedAt: string;
   modules: ArchModule[];
   edges: ArchEdge[];
-  traces: DataTrace[];
 }
 
 /** Panel selection — either a component (group) or a specific module */

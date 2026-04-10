@@ -36,7 +36,6 @@ function saveRecentRepo(entry: RepoEntry) {
 export default function Home() {
   const [graph, setGraph] = useState<ArchGraph | null>(null);
   const [selection, setSelection] = useState<PanelSelection | null>(null);
-  const [activeTrace, setActiveTrace] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loadingStatus, setLoadingStatus] = useState("Analyzing...");
@@ -55,6 +54,8 @@ export default function Home() {
   const chatHighlights = useChatStore((s) => s.highlights);
   const setCanvasContext = useChatStore((s) => s.setCanvasContext);
   const setChatRepoKey = useChatStore((s) => s.setRepoKey);
+  const dynamicTrace = useChatStore((s) => s.activeTrace);
+  const hoveredStepIndex = useChatStore((s) => s.hoveredStepIndex);
   const selectedNodeId = highlightOverride
     ?? (selection
       ? selection.kind === "module"
@@ -86,7 +87,6 @@ export default function Home() {
   function loadGraph(g: ArchGraph) {
     setGraph(g);
     setSelection(null);
-    setActiveTrace(null);
     setError(null);
     setHighlightOverride(null);
     setPanelExpandedCategory(null);
@@ -100,9 +100,9 @@ export default function Home() {
   // Sync canvas context to chat store
   useEffect(() => {
     if (!graph) return;
-    const ctx = buildCanvasContext(graph, selection, "system", activeTrace, panelDepth, activeFile);
+    const ctx = buildCanvasContext(graph, selection, "system", panelDepth, activeFile);
     setCanvasContext(ctx);
-  }, [graph, selection, activeTrace, panelDepth, activeFile, setCanvasContext]);
+  }, [graph, selection, panelDepth, activeFile, setCanvasContext]);
 
   // Init chat store when graph loads
   useEffect(() => {
@@ -125,7 +125,6 @@ export default function Home() {
     abortRef.current?.abort();
     setGraph(null);
     setSelection(null);
-    setActiveTrace(null);
     setLoading(false);
     setError(null);
     setStreamedText("");
@@ -142,7 +141,6 @@ export default function Home() {
     setError(null);
     setGraph(null);
     setSelection(null);
-    setActiveTrace(null);
     setLoadingStatus("Connecting...");
     setStreamedText("");
 
@@ -232,18 +230,6 @@ export default function Home() {
         onGoHome={goHome}
       />
 
-      {/* Trace description bar */}
-      {activeTrace && graph && (() => {
-        const trace = graph.traces.find((t) => t.name === activeTrace);
-        return trace ? (
-          <div className="px-5 py-1.5 border-b border-border text-[11px] text-text-secondary flex items-center gap-2 shrink-0">
-            <span className="text-foreground font-medium">{trace.name}</span>
-            <span className="text-text-tertiary">/</span>
-            <span className="text-text-tertiary">{trace.description}</span>
-          </div>
-        ) : null;
-      })()}
-
       <div className="flex-1 min-h-0 relative">
         {/* Detail panel — floating on LEFT side over canvas */}
         {selection && (
@@ -293,7 +279,8 @@ export default function Home() {
           {graph && (
             <GraphCanvas
               graph={graph}
-              activeTrace={activeTrace}
+              dynamicTrace={dynamicTrace}
+              hoveredStepIndex={hoveredStepIndex}
               onSelect={handleSelect}
               selectedNodeId={selectedNodeId}
               panelExpandedCategory={panelExpandedCategory}

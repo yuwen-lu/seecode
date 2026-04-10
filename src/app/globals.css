@@ -260,6 +260,18 @@ body {
   pointer-events: none;
 }
 
+/* Trace-active node — subtle glow */
+.node-trace-active {
+  box-shadow: 0 0 0 1px var(--accent-muted, rgba(99, 102, 241, 0.2)),
+              0 0 12px rgba(99, 102, 241, 0.08);
+}
+
+/* Hovered trace step — stronger glow pulse */
+.node-trace-step-hovered {
+  box-shadow: 0 0 0 1.5px var(--accent),
+              0 0 20px rgba(99, 102, 241, 0.15);
+}
+
 /* Hide scrollbar */
 .hide-scrollbar::-webkit-scrollbar { display: none; }
 .hide-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
