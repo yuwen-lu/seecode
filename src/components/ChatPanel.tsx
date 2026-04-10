@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
-import { Send, X, FileText, Loader2, MessageCircle, Minus, Plus } from "lucide-react";
+import { Send, X, FileText, Loader2, MessageCircle, RectangleHorizontal, Plus } from "lucide-react";
 import Markdown from "react-markdown";
 import { useChatStore } from "@/store/chat-store";
 import { buildFileIndex } from "@/lib/chat-references";
@@ -52,7 +52,11 @@ export function ChatPanel({ modules, onFileClick }: ChatPanelProps) {
     function onKeyDown(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key === "l") {
         e.preventDefault();
-        if (!isOpen) setOpen(true);
+        if (!isOpen) {
+          useChatStore.getState().clearMessages();
+          clearHighlights();
+          setOpen(true);
+        }
         setTimeout(() => inputRef.current?.focus(), 50);
       }
     }
@@ -180,7 +184,7 @@ export function ChatPanel({ modules, onFileClick }: ChatPanelProps) {
       {/* Floating toggle button — bottom right */}
       {!isOpen && (
         <button
-          onClick={toggleOpen}
+          onClick={() => { clearChat(); setOpen(true); }}
           className="fixed bottom-5 right-5 z-40 p-3 rounded-full bg-surface-1 border border-border text-text-secondary hover:text-foreground hover:border-border-strong transition-all cursor-pointer"
         >
           <MessageCircle size={18} />
@@ -211,7 +215,7 @@ export function ChatPanel({ modules, onFileClick }: ChatPanelProps) {
                 </button>
               )}
               <button onClick={() => setOpen(false)} className="p-1 text-text-tertiary hover:text-text-secondary transition-colors cursor-pointer" title="Minimize">
-                <Minus size={14} />
+                <RectangleHorizontal size={14} />
               </button>
             </div>
           </div>
