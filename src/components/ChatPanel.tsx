@@ -138,7 +138,7 @@ export function ChatPanel({ modules, onFileClick }: ChatPanelProps) {
                 fullText += data.text;
                 updateLastAssistant(fullText);
               }
-              if (data.content !== undefined && data.refs) {
+              if (data.content !== undefined && Array.isArray(data.refs)) {
                 const fileRefs = extractRefsFromModuleIds(data.refs, modules);
                 finalizeLastAssistant(fileRefs);
                 setHighlights(new Set<string>(fileRefs.map((r: FileReference) => r.moduleId)));
@@ -224,14 +224,14 @@ export function ChatPanel({ modules, onFileClick }: ChatPanelProps) {
                   Ask questions about the codebase.<br />
                   Select a module on the canvas for context.
                 </p>
-                <div className="flex flex-col gap-1.5 w-full max-w-[300px]">
+                <div className="flex flex-col items-center gap-1.5">
                   {STARTER_QUESTIONS.map((q) => (
                     <button
                       key={q}
                       onClick={() => sendMessage(q)}
                       onMouseEnter={() => setInput(q)}
                       onMouseLeave={() => setInput("")}
-                      className="text-left text-xs text-text-secondary hover:text-foreground px-3 py-2 rounded-full border border-border hover:border-border-strong hover:bg-surface-2/80 transition-colors cursor-pointer"
+                      className="text-xs text-text-secondary hover:text-foreground px-3 py-2 rounded-full border border-border hover:border-border-strong hover:bg-surface-2/80 transition-colors cursor-pointer"
                     >
                       {q}
                     </button>

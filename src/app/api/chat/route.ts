@@ -3,7 +3,11 @@ import Anthropic from "@anthropic-ai/sdk";
 import type { CanvasContext } from "@/types/chat";
 import { serializeForPrompt } from "@/lib/canvas-context";
 
-const client = new Anthropic();
+let _client: Anthropic | null = null;
+function getClient(): Anthropic {
+  if (!_client) _client = new Anthropic();
+  return _client;
+}
 
 export const maxDuration = 60;
 
@@ -44,9 +48,20 @@ export async function POST(request: NextRequest) {
     });
   }
 
+  let client: Anthropic;
+  try {
+    client = getClient();
+  } catch {
+    return new Response(
+      JSON.stringify({ error: "Anthropic API key not configured. Set ANTHROPIC_API_KEY in your environment." }),
+      { status: 500, headers: { "Content-Type": "application/json" } },
+    );
+  }
+
   const systemPrompt = buildSystemPrompt(context);
+  const safeHistory = Array.isArray(history) ? history : [];
   const messages: Anthropic.MessageParam[] = [
-    ...history.map((h) => ({ role: h.role as "user" | "assistant", content: h.content })),
+    ...safeHistory.map((h) => ({ role: h.role as "user" | "assistant", content: h.content })),
     { role: "user", content: message },
   ];
 
