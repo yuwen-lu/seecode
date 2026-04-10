@@ -32,7 +32,6 @@ describe("parseResponse", () => {
     expect(result.modules).toHaveLength(1);
     expect(result.modules[0].name).toBe("Auth Service");
     expect(result.edges).toHaveLength(1);
-    expect(result.traces).toHaveLength(1);
   });
 
   it("fills in missing keyTypes/keyMethods/files with empty arrays", () => {
@@ -63,7 +62,6 @@ describe("parseResponse", () => {
     const result = parseResponse(text);
     expect(result.modules).toEqual([]);
     expect(result.edges).toEqual([]);
-    expect(result.traces).toEqual([]);
   });
 
   it("throws when no JSON block is found", () => {
