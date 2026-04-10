@@ -267,3 +267,12 @@ body {
     animation-delay: 0ms !important;
   }
 }
+
+/* Canvas hints — visible briefly, then fade out */
+.animate-hint-fade {
+  animation: hint-fade 6s ease forwards;
+}
+@keyframes hint-fade {
+  0%, 60% { opacity: 1; }
+  100% { opacity: 0; }
+}

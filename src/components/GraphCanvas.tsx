@@ -36,9 +36,26 @@ interface GraphCanvasProps {
   chatHighlights?: Set<string>;
 }
 
+function HintNode() {
+  return (
+    <div className="select-none pointer-events-none max-w-[260px]">
+      <p className="text-sm text-text-tertiary/70 leading-relaxed mb-3">
+        Interactive visualization of the components in this repo.
+      </p>
+      <div className="flex flex-col gap-1 text-sm text-text-tertiary/50">
+        <span>Click a node to inspect</span>
+        <span>Double-click a node to expand</span>
+        <span>Scroll to zoom, drag to pan</span>
+        <span>Use the bottom-right button to ask AI</span>
+      </div>
+    </div>
+  );
+}
+
 const nodeTypes = {
   archNode: ArchNode,
   groupNode: GroupNode,
+  hintNode: HintNode,
 };
 
 function GraphCanvasInner({
@@ -178,10 +195,22 @@ function GraphCanvasInner({
   }, [zoomLevel, expandedCategories, allCategories]);
 
   // Build the hybrid layout
-  const layout = useMemo(
-    () => buildHybridGraph(graph, effectiveExpanded),
-    [graph, effectiveExpanded]
-  );
+  const layout = useMemo(() => {
+    const result = buildHybridGraph(graph, effectiveExpanded);
+    // Add hint node to the left of all nodes
+    const minX = Math.min(...result.nodes.map((n) => n.position.x));
+    const minY = Math.min(...result.nodes.map((n) => n.position.y));
+    result.nodes.push({
+      id: "__hint__",
+      type: "hintNode",
+      position: { x: minX - 320, y: minY },
+      data: {},
+      draggable: false,
+      selectable: false,
+      connectable: false,
+    });
+    return result;
+  }, [graph, effectiveExpanded]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(layout.nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(layout.edges);
@@ -495,6 +524,9 @@ function GraphCanvasInner({
             : null;
 
           return nodes.map((n) => {
+            // Skip hint node from selection/trace logic
+            if (n.type === "hintNode") return n;
+
             const isSelected = n.id === selectedNodeId ||
               (n.type === "groupNode" && selectedNodeId
                 ? ((n.data as { members?: ArchModule[] })?.members ?? []).some((m) => m.id === selectedNodeId)
