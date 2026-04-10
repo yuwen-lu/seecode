@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
-import { Send, X, FileText, Loader2, MessageCircle, RectangleHorizontal, Plus, ChevronDown, ChevronRight, ArrowRight, Search } from "lucide-react";
+import { Send, X, FileText, Loader2, RectangleHorizontal, Plus, ChevronDown, ChevronRight, ArrowRight, Search, SquareTerminal } from "lucide-react";
 import Markdown from "react-markdown";
 import { useChatStore } from "@/store/chat-store";
 import { buildFileIndex } from "@/lib/chat-references";
@@ -11,9 +11,9 @@ import type { ChatMessage, FileReference, ToolCallInfo } from "@/types/chat";
 
 const STARTER_QUESTIONS = [
   "What does this codebase do?",
-  "Walk me through the main data flow",
+  "Trace how a request flows through the system",
   "What are the key entry points?",
-  "How are the modules connected?",
+  "Which modules are most connected?",
 ];
 
 const TOOL_LABELS: Record<string, string> = {
@@ -198,9 +198,10 @@ export function ChatPanel({ graph, onFileClick }: ChatPanelProps) {
       {!isOpen && (
         <button
           onClick={toggleOpen}
-          className="fixed bottom-5 right-5 z-40 p-3 rounded-full bg-surface-1 border border-border text-text-secondary hover:text-foreground hover:border-border-strong transition-all cursor-pointer"
+          className="fixed bottom-5 right-5 z-40 flex items-center gap-2 px-3 py-2 rounded-full bg-surface-1 border border-border text-text-secondary hover:text-foreground hover:border-border-strong transition-all cursor-pointer"
         >
-          <MessageCircle size={18} />
+          <SquareTerminal size={15} />
+          <span className="text-sm">Ask</span>
         </button>
       )}
 
@@ -215,28 +216,32 @@ export function ChatPanel({ graph, onFileClick }: ChatPanelProps) {
           />
 
           <div className="flex items-center justify-between px-4 py-2.5 border-b border-border shrink-0">
-            <span className="text-sm font-medium text-text-secondary truncate">
-              Chat
-            </span>
-            <div className="flex items-center gap-0.5 shrink-0">
+            <div className="flex items-center gap-1.5">
+              <span className="text-sm font-medium text-text-secondary truncate">
+                Chat
+              </span>
               {messages.length > 0 && (
                 <button onClick={clearChat} className="p-1 text-text-tertiary hover:text-text-secondary transition-colors cursor-pointer" title="New chat">
                   <Plus size={14} />
                 </button>
               )}
-              <button onClick={() => setOpen(false)} className="p-1 text-text-tertiary hover:text-text-secondary transition-colors cursor-pointer" title="Minimize">
-                <RectangleHorizontal size={14} />
-              </button>
             </div>
+            <button onClick={() => setOpen(false)} className="p-1 text-text-tertiary hover:text-text-secondary transition-colors cursor-pointer" title="Minimize">
+              <RectangleHorizontal size={14} />
+            </button>
           </div>
 
           <div className="flex-1 overflow-y-auto overflow-x-hidden subtle-scrollbar px-4 py-3">
             {messages.length === 0 && (
-              <div className="h-full flex flex-col items-center justify-center gap-5">
-                <p className="text-text-tertiary text-sm text-center leading-relaxed">
-                  Ask questions about the codebase.<br />
-                  Select a module on the canvas for context.
-                </p>
+              <div className="h-full flex flex-col items-center justify-center gap-6">
+                <div className="text-center">
+                  <p className="text-foreground text-sm font-medium mb-1">
+                    Explore this codebase
+                  </p>
+                  <p className="text-text-tertiary text-sm leading-relaxed max-w-[280px]">
+                    Ask about architecture, trace data flows, or select a module on the canvas for focused questions.
+                  </p>
+                </div>
                 <div className="flex flex-col items-center gap-1.5">
                   {STARTER_QUESTIONS.map((q) => (
                     <button

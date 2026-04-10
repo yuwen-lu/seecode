@@ -350,10 +350,10 @@ function HomeView({
     <div className="absolute inset-0 flex items-start justify-center pt-[18vh]">
       <div className="w-full max-w-md px-6">
         <h2 className="text-lg font-semibold text-foreground mb-1">
-          Visualize any codebase
+          Understand any codebase
         </h2>
         <p className="text-text-secondary text-sm mb-6">
-          Paste a GitHub URL to generate an interactive architecture diagram.
+          Paste a GitHub repo to see its architecture, trace data flows, and chat with an AI that reads the actual source code.
         </p>
 
         <form onSubmit={handleSubmit} className="flex gap-2 mb-8">
