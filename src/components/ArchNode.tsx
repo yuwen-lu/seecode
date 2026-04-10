@@ -10,8 +10,10 @@ import type { ZoomLevel } from "@/lib/semantic-zoom";
 interface ArchNodeData {
   module: ArchModule;
   dimmed?: boolean;
+  sibling?: boolean;
   zoomLevel?: ZoomLevel;
   highlighted?: boolean;
+  marchingAnts?: boolean;
   isDark?: boolean;
 }
 
@@ -21,7 +23,7 @@ export const ArchNode = memo(function ArchNode({
   data: ArchNodeData;
   selected?: boolean;
 }) {
-  const { module: mod, dimmed, zoomLevel, highlighted, isDark } = data;
+  const { module: mod, dimmed, sibling, zoomLevel, highlighted, marchingAnts, isDark } = data;
   const colors = getCategoryColors(isDark)[mod.category];
 
   const showDetail = zoomLevel === "detailed";
@@ -32,11 +34,13 @@ export const ArchNode = memo(function ArchNode({
     <>
       <Handle type="target" position={Position.Top} className="!bg-transparent !border-0 !w-2 !h-2" />
       <div
-        className={`rounded-lg px-3 py-2 bg-surface-1 border border-border${highlighted ? " node-chat-highlight" : ""}`}
+        className={`relative rounded-lg px-3 py-2 bg-surface-1 border${sibling ? "" : " border-border"}${highlighted ? " node-chat-highlight" : ""}${marchingAnts ? " node-landing-glow" : ""}`}
         style={{
           width: 260,
-          opacity: dimmed ? 0.5 : 1,
-        }}
+          opacity: dimmed ? 0.5 : sibling ? 0.72 : 1,
+          borderColor: sibling ? colors.border + "40" : undefined,
+          "--glow-color": colors.border,
+        } as React.CSSProperties}
       >
         {/* Category label + name */}
         <span className="text-[8px] font-medium uppercase tracking-wide" style={{ color: colors.border }}>

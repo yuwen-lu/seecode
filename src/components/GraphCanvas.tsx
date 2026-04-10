@@ -77,6 +77,11 @@ function GraphCanvasInner({
 
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
 
+  // Marching ants highlight after group expansion
+  const [marchingAntNodes, setMarchingAntNodes] = useState<Set<string>>(new Set());
+  const marchStartTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const marchEndTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const clickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [animClass, setAnimClass] = useState<"" | "react-flow--seeding" | "react-flow--morphing" | "react-flow--animating" | "react-flow--entering">("react-flow--entering");
   const animTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -88,6 +93,8 @@ function GraphCanvasInner({
       if (clickTimer.current) clearTimeout(clickTimer.current);
       if (animTimer.current) clearTimeout(animTimer.current);
       if (fitViewTimer.current) clearTimeout(fitViewTimer.current);
+      if (marchStartTimer.current) clearTimeout(marchStartTimer.current);
+      if (marchEndTimer.current) clearTimeout(marchEndTimer.current);
     };
   }, []);
 
@@ -366,20 +373,29 @@ function GraphCanvasInner({
           triggerAnimation();
           pushExpansion(next);
           scheduleFitView();
+
+          // Landing glow on the revealed nodes after morph + zoom settle
+          const memberIds = graph.modules
+            .filter((m) => m.category === category)
+            .map((m) => m.id);
+          if (marchStartTimer.current) clearTimeout(marchStartTimer.current);
+          if (marchEndTimer.current) clearTimeout(marchEndTimer.current);
+          setMarchingAntNodes(new Set());
+          marchStartTimer.current = setTimeout(() => {
+            setMarchingAntNodes(new Set(memberIds));
+            marchEndTimer.current = setTimeout(() => {
+              setMarchingAntNodes(new Set());
+            }, 3000);
+          }, 950);
         }
       } else {
-        // Expand this module to detail level (local, not global)
+        // Expand this module to detail level (local, card expands in place)
         if (!detailedModules.has(node.id)) {
           setDetailedModules((prev) => new Set(prev).add(node.id));
         }
-        // Gently zoom to this node so the detail content is readable
-        if (fitViewTimer.current) clearTimeout(fitViewTimer.current);
-        fitViewTimer.current = setTimeout(() => {
-          fitView({ padding: 0.5, duration: 750, maxZoom: 1.0, nodes: [{ id: node.id }] });
-        }, 100);
       }
     },
-    [expandedCategories, detailedModules, triggerAnimation, pushExpansion, scheduleFitView, fitView]
+    [expandedCategories, detailedModules, triggerAnimation, pushExpansion, scheduleFitView]
   );
 
   const onPaneClick = useCallback(() => {
@@ -431,42 +447,50 @@ function GraphCanvasInner({
     <>
       <ReactFlow
         className={animClass || undefined}
-        nodes={nodes.map((n) => {
-          // Match by exact ID, group membership, or category when a group was expanded
-          const selectedCategory = selectedNodeId?.startsWith("group-")
+        nodes={(() => {
+          const selectedGroupCategory = selectedNodeId?.startsWith("group-")
             ? selectedNodeId.slice(6) as NodeCategory
             : null;
-          const isSelected = n.id === selectedNodeId ||
-            // Group node containing the selected module
-            (n.type === "groupNode" && selectedNodeId
-              ? ((n.data as { members?: ArchModule[] })?.members ?? []).some((m) => m.id === selectedNodeId)
-              : false) ||
-            // Individual node belonging to the selected group's category
-            (selectedCategory && n.type !== "groupNode"
-              ? graph.modules.find((m) => m.id === n.id)?.category === selectedCategory
-              : false);
-          const dimmedBySelection = !!selectedNodeId && !isSelected;
-          const dimmedByTrace = !!traceNodeIds && !traceNodeIds.has(n.id);
-          return {
-            ...n,
-            selected: isSelected,
-            data: {
-              ...n.data,
-              dimmed: dimmedBySelection || dimmedByTrace,
-              // Per-node detail override, otherwise at least compact for individual nodes
-              zoomLevel: n.type === "groupNode"
-                ? zoomLevel
-                : detailedModules.has(n.id)
-                  ? "detailed"
-                  : (zoomLevel === "collapsed" ? "compact" : zoomLevel),
-              isDark,
-              highlighted: chatHighlights?.has(n.id) ||
-                (n.type === "groupNode" && chatHighlights
-                  ? ((n.data as { members?: ArchModule[] })?.members ?? []).some((m) => chatHighlights.has(m.id))
-                  : false),
-            },
-          };
-        })}
+          const selectedModuleCategory = !selectedGroupCategory && selectedNodeId
+            ? graph.modules.find((m) => m.id === selectedNodeId)?.category ?? null
+            : null;
+
+          return nodes.map((n) => {
+            const isSelected = n.id === selectedNodeId ||
+              (n.type === "groupNode" && selectedNodeId
+                ? ((n.data as { members?: ArchModule[] })?.members ?? []).some((m) => m.id === selectedNodeId)
+                : false) ||
+              (selectedGroupCategory && n.type !== "groupNode"
+                ? graph.modules.find((m) => m.id === n.id)?.category === selectedGroupCategory
+                : false);
+            const dimmedBySelection = !!selectedNodeId && !isSelected;
+            const dimmedByTrace = !!traceNodeIds && !traceNodeIds.has(n.id);
+            const isSibling = !isSelected && n.type !== "groupNode" && (
+              (selectedGroupCategory && graph.modules.find((m) => m.id === n.id)?.category === selectedGroupCategory) ||
+              (selectedModuleCategory && graph.modules.find((m) => m.id === n.id)?.category === selectedModuleCategory)
+            );
+            return {
+              ...n,
+              selected: isSelected,
+              data: {
+                ...n.data,
+                dimmed: dimmedByTrace || (dimmedBySelection && !isSibling),
+                sibling: isSibling && !dimmedByTrace,
+                zoomLevel: n.type === "groupNode"
+                  ? zoomLevel
+                  : detailedModules.has(n.id)
+                    ? "detailed"
+                    : (zoomLevel === "collapsed" ? "compact" : zoomLevel),
+                isDark,
+                highlighted: chatHighlights?.has(n.id) ||
+                  (n.type === "groupNode" && chatHighlights
+                    ? ((n.data as { members?: ArchModule[] })?.members ?? []).some((m) => chatHighlights.has(m.id))
+                    : false),
+                marchingAnts: marchingAntNodes.has(n.id),
+              },
+            };
+          });
+        })()}
         edges={edges.map((e) => {
           if (!selectedNodeId && !traceNodeIds) return e;
           if (selectedNodeId) {

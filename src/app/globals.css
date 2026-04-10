@@ -104,6 +104,7 @@ body {
 .react-flow__node {
   transition: opacity 0.3s ease;
   cursor: pointer !important;
+  overflow: visible !important;
 }
 .react-flow__node > div {
   transition: opacity 0.2s ease;
@@ -219,6 +220,30 @@ body {
 .node-detail-expand > div {
   overflow: hidden;
   min-height: 0;
+}
+
+/* Landing glow — pulses on the node after group expand, then fades.
+   Uses a ::before pseudo with constant box-shadow + animated opacity
+   to sidestep CSS-variable-in-keyframes browser quirks. */
+.node-landing-glow {
+  position: relative;
+}
+.node-landing-glow::before {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: inherit;
+  box-shadow: 0 0 18px 5px var(--glow-color, transparent);
+  pointer-events: none;
+  animation: glow-pulse 2.8s ease forwards;
+}
+@keyframes glow-pulse {
+  0%   { opacity: 0; }
+  12%  { opacity: 0.7; }
+  35%  { opacity: 0.25; }
+  55%  { opacity: 0.8; }
+  75%  { opacity: 0.2; }
+  100% { opacity: 0; }
 }
 
 /* Chat-referenced node highlight */
