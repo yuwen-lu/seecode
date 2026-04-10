@@ -52,7 +52,6 @@ export interface CanvasContext {
     files: string[];
   }[];
   zoomLevel: "system" | "module" | "detail";
-  activeTrace: string | null;
   panelDepth: "component" | "module" | "file" | null;
   activeFile: string | null;
 }

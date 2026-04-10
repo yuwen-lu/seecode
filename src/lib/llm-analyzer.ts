@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { ExtractionResult } from "./extractors";
 import type { SourceFile } from "./repo";
-import type { ArchGraph, ArchModule, ArchEdge, DataTrace } from "@/types/graph";
+import type { ArchGraph, ArchModule, ArchEdge } from "@/types/graph";
 import fs from "fs";
 
 const client = new Anthropic();
@@ -9,7 +9,6 @@ const client = new Anthropic();
 interface LLMAnalysisResult {
   modules: ArchModule[];
   edges: ArchEdge[];
-  traces: DataTrace[];
 }
 
 export { buildStructureSummary, buildPrompt, parseResponse };
@@ -125,7 +124,7 @@ function buildStructureSummary(
 function buildPrompt(structureSummary: string, repoName: string): string {
   return `You are analyzing the architecture of the GitHub repository "${repoName}".
 
-Below is the extracted code structure. Analyze it and produce a **structured JSON** object describing modules, edges, and data flow traces.
+Below is the extracted code structure. Analyze it and produce a **structured JSON** object describing modules and edges.
 
 Rules for the JSON:
 - Each module should represent a logical component (not every single file — group related files)
@@ -135,7 +134,6 @@ Rules for the JSON:
 - IMPORTANT: Include a "files" array with the EXACT relative file paths from the code structure above (e.g. "src/lib/cache.ts"). Every source file must belong to exactly one module.
 - Include lineCount if you can estimate it
 - Edges should have a type: "owns" (creates/manages), "depends" (uses), "dataflow" (data passes through), "weak" (optional/loose coupling)
-- Include 1-3 data flow traces showing how a request/operation moves through the system
 
 Each module MUST follow this shape:
 { "id": "kebab-case-id", "name": "Human Name", "category": "core", "responsibility": "...", "files": ["src/path/to/file.ts", ...], "keyTypes": [...], "keyMethods": [...] }
@@ -145,8 +143,7 @@ Respond in EXACTLY this format (no other text):
 \`\`\`json
 {
   "modules": [...],
-  "edges": [...],
-  "traces": [...]
+  "edges": [...]
 }
 \`\`\`
 
@@ -277,7 +274,7 @@ function parseResponse(text: string): LLMAnalysisResult {
     throw new Error("LLM response did not contain a valid JSON block");
   }
 
-  let parsed: { modules?: ArchModule[]; edges?: ArchEdge[]; traces?: DataTrace[] };
+  let parsed: { modules?: ArchModule[]; edges?: ArchEdge[] };
   try {
     parsed = JSON.parse(jsonMatch[1].trim());
   } catch (err) {
@@ -300,6 +297,5 @@ function parseResponse(text: string): LLMAnalysisResult {
     edges: (parsed.edges ?? []).filter(
       (e) => e && typeof e.from === "string" && typeof e.to === "string",
     ),
-    traces: parsed.traces ?? [],
   };
 }

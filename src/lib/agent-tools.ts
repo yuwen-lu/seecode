@@ -34,16 +34,6 @@ export const agentTools: Anthropic.Tool[] = [
     },
   },
   {
-    name: "get_traces",
-    description:
-      "Get pre-analyzed data flow traces that show how requests/operations move through the system. Each trace has a name, description, and an ordered list of module IDs. Use these as starting points when the user asks about flows.",
-    input_schema: {
-      type: "object" as const,
-      properties: {},
-      required: [],
-    },
-  },
-  {
     name: "read_file",
     description:
       "Read the contents of a source file from the repository. Fetches the file at the exact commit that was analyzed. Use when you need to see actual implementation details, trace function calls, or understand specific code. Files are truncated to ~6000 chars for large files.",
@@ -103,18 +93,6 @@ export async function executeTool(
       );
     }
 
-    case "get_traces": {
-      if (!graph.traces || graph.traces.length === 0) return "No pre-analyzed traces available.";
-      return JSON.stringify(
-        graph.traces.map((t) => ({
-          name: t.name,
-          description: t.description,
-          path: t.path,
-          pathNames: t.path.map((id) => graph.modules.find((m) => m.id === id)?.name ?? id),
-        })),
-      );
-    }
-
     case "read_file": {
       const filePath = input.filePath as string;
       const url = githubRawUrl(graph.repoUrl, graph.commitSha, filePath);
@@ -155,7 +133,6 @@ ${moduleList}
 You have tools to explore the codebase. Use them to gather information before answering.
 - Use get_module to inspect a module's files, types, and methods
 - Use get_connections to trace data flow and dependencies between modules
-- Use get_traces to see pre-analyzed flow paths through the system
 - Use read_file to see actual source code when you need implementation details
 
 Be thorough but efficient — read the files and connections you need, then give a clear answer.

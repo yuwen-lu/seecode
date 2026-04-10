@@ -87,7 +87,6 @@ export async function POST(request: NextRequest) {
           analyzedAt: new Date().toISOString(),
           modules: llmResult.modules,
           edges: llmResult.edges,
-          traces: llmResult.traces,
         };
 
         cacheGraph(graph);

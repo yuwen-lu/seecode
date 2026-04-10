@@ -18,7 +18,6 @@ const STARTER_QUESTIONS = [
 const TOOL_LABELS: Record<string, string> = {
   get_module: "Inspecting module",
   get_connections: "Checking connections",
-  get_traces: "Reading traces",
   read_file: "Reading file",
   search_code: "Searching code",
 };

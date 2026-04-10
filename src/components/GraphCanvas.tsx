@@ -27,7 +27,6 @@ import { useTheme } from "next-themes";
 
 interface GraphCanvasProps {
   graph: ArchGraph;
-  activeTrace: string | null;
   dynamicTrace?: DynamicTrace | null;
   hoveredStepIndex?: number | null;
   onSelect: (selection: PanelSelection | null) => void;
@@ -44,7 +43,6 @@ const nodeTypes = {
 
 function GraphCanvasInner({
   graph,
-  activeTrace,
   dynamicTrace,
   hoveredStepIndex,
   onSelect,
@@ -336,22 +334,14 @@ function GraphCanvasInner({
     prevGroupMembership.current = nextMembership;
   }, [layout, setNodes, setEdges, fitView]);
 
-  // Trace highlighting — supports both pre-generated (activeTrace) and dynamic traces
+  // Trace highlighting — dynamic traces from agent chat
   useEffect(() => {
-    const tracePath: string[] | null = (() => {
-      if (dynamicTrace) return dynamicTrace.steps.map((s) => s.moduleId);
-      if (activeTrace) {
-        const t = graph.traces.find((t) => t.name === activeTrace);
-        return t?.path ?? null;
-      }
-      return null;
-    })();
-
-    if (!tracePath) {
+    if (!dynamicTrace) {
       setEdges(layout.edges);
       return;
     }
 
+    const tracePath = dynamicTrace.steps.map((s) => s.moduleId);
     const traceEdgeSet = new Set<string>();
     for (let i = 0; i < tracePath.length - 1; i++) {
       const fromId = layout.nodeIdMap.get(tracePath[i]) ?? tracePath[i];
@@ -378,7 +368,7 @@ function GraphCanvasInner({
         };
       })
     );
-  }, [activeTrace, dynamicTrace, graph.traces, layout.edges, layout.nodeIdMap, setEdges]);
+  }, [dynamicTrace, layout.edges, layout.nodeIdMap, setEdges]);
 
   // Single click: select node (delayed to avoid firing during double-click)
   // At system level, clicking a group shows the component panel (no expansion).
@@ -484,21 +474,13 @@ function GraphCanvasInner({
 
   // Compute which nodes are on the active trace (mapped through nodeIdMap)
   const traceNodeIds = useMemo(() => {
-    const tracePath: string[] | null = (() => {
-      if (dynamicTrace) return dynamicTrace.steps.map((s) => s.moduleId);
-      if (activeTrace) {
-        const t = graph.traces.find((t) => t.name === activeTrace);
-        return t?.path ?? null;
-      }
-      return null;
-    })();
-    if (!tracePath) return null;
+    if (!dynamicTrace) return null;
     const ids = new Set<string>();
-    for (const moduleId of tracePath) {
-      ids.add(layout.nodeIdMap.get(moduleId) ?? moduleId);
+    for (const step of dynamicTrace.steps) {
+      ids.add(layout.nodeIdMap.get(step.moduleId) ?? step.moduleId);
     }
     return ids;
-  }, [activeTrace, dynamicTrace, graph.traces, layout.nodeIdMap]);
+  }, [dynamicTrace, layout.nodeIdMap]);
 
   return (
     <>

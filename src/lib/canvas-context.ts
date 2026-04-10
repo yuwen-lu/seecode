@@ -14,7 +14,6 @@ export function buildCanvasContext(
   graph: ArchGraph,
   selection: PanelSelection | null,
   zoomLevel: "system" | "module" | "detail",
-  activeTrace: string | null,
   panelDepth: PanelDepth | null,
   activeFile: string | null,
 ): CanvasContext {
@@ -74,7 +73,7 @@ export function buildCanvasContext(
     overview: graph.modules.map((m) => ({
       id: m.id, name: m.name, category: m.category, responsibility: m.responsibility, files: m.files,
     })),
-    zoomLevel, activeTrace, panelDepth: panelDepth ?? null, activeFile,
+    zoomLevel, panelDepth: panelDepth ?? null, activeFile,
   };
 }
 
@@ -83,7 +82,6 @@ export function serializeForPrompt(ctx: CanvasContext): string {
   lines.push("## Current View");
   lines.push(`- Repository: ${ctx.repoUrl}`);
   lines.push(`- Zoom level: ${ctx.zoomLevel}`);
-  if (ctx.activeTrace) lines.push(`- Active trace: ${ctx.activeTrace}`);
 
   if (ctx.selected) {
     lines.push("", `## Selected Module: ${ctx.selected.name} (id: ${ctx.selected.id})`);

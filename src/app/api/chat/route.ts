@@ -30,9 +30,6 @@ function buildContextHint(ctx: CanvasContext): string {
   } else if (ctx.selectedComponent) {
     parts.push(`The developer currently has the "${ctx.selectedComponent.label}" component group selected, containing: ${ctx.selectedComponent.members.map((m) => m.name).join(", ")}.`);
   }
-  if (ctx.activeTrace) {
-    parts.push(`Active trace: ${ctx.activeTrace}`);
-  }
   return parts.length > 0 ? `\n\nContext: ${parts.join(" ")}` : "";
 }
 
