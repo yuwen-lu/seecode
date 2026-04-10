@@ -54,17 +54,6 @@ export function ChatPanel({ modules, onFileClick }: ChatPanelProps) {
     return () => { abortRef.current?.abort(); };
   }, []);
 
-  useEffect(() => {
-    function onKeyDown(e: KeyboardEvent) {
-      if ((e.metaKey || e.ctrlKey) && e.key === "l") {
-        e.preventDefault();
-        if (!isOpen) setOpen(true);
-        setTimeout(() => inputRef.current?.focus(), 50);
-      }
-    }
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [isOpen, setOpen]);
 
   const onResizeMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
