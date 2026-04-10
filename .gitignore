@@ -49,6 +49,10 @@ next-env.d.ts
 
 # claude code
 .claude/
+.agents/
+skills-lock.json
+.impeccable.md
+.playwright-mcp/
 
 # screenshots from testing
 *.png
