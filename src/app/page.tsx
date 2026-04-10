@@ -95,12 +95,6 @@ export default function Home() {
       repoName: g.repoName,
       analyzedAt: g.analyzedAt ?? new Date().toISOString(),
     });
-    // Ensure server-side cache has the graph so /api/chat can find it
-    fetch("/api/cache-graph", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(g),
-    }).catch(() => {});
   }
 
   // Sync canvas context to chat store
@@ -299,7 +293,7 @@ export default function Home() {
 
       {/* Chat panel — floating bottom-right overlay */}
       {graph && (
-        <ChatPanel modules={graph.modules} onFileClick={handleChatFileClick} />
+        <ChatPanel graph={graph} onFileClick={handleChatFileClick} />
       )}
     </div>
   );

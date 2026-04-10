@@ -1,7 +1,6 @@
 import { NextRequest } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import type { CanvasContext } from "@/types/chat";
-import { getCachedGraph, getLatestCachedGraph } from "@/lib/cache";
 import { agentTools, executeTool, buildAgentSystemPrompt } from "@/lib/agent-tools";
 import type { ArchGraph } from "@/types/graph";
 
@@ -19,12 +18,7 @@ interface ChatRequestBody {
   message: string;
   context: CanvasContext;
   history: { role: "user" | "assistant"; content: string }[];
-}
-
-function resolveGraph(ctx: CanvasContext): ArchGraph | null {
-  const exact = getCachedGraph(ctx.repoUrl, ctx.commitSha);
-  if (exact) return exact;
-  return getLatestCachedGraph(ctx.repoUrl);
+  graph: ArchGraph;
 }
 
 function buildContextHint(ctx: CanvasContext): string {
@@ -39,7 +33,7 @@ function buildContextHint(ctx: CanvasContext): string {
 
 export async function POST(request: NextRequest) {
   const body: ChatRequestBody = await request.json();
-  const { message, context, history } = body;
+  const { message, context, history, graph } = body;
 
   if (!message || typeof message !== "string") {
     return new Response(JSON.stringify({ error: "Missing message" }), {
@@ -58,10 +52,9 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const graph = resolveGraph(context);
-  if (!graph) {
-    return new Response(JSON.stringify({ error: "Graph not found in cache" }), {
-      status: 404,
+  if (!graph?.modules) {
+    return new Response(JSON.stringify({ error: "Missing graph data" }), {
+      status: 400,
       headers: { "Content-Type": "application/json" },
     });
   }

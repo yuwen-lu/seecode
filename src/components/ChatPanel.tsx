@@ -5,7 +5,7 @@ import { Send, X, FileText, Loader2, MessageCircle, RectangleHorizontal, Plus, C
 import Markdown from "react-markdown";
 import { useChatStore } from "@/store/chat-store";
 import { buildFileIndex } from "@/lib/chat-references";
-import type { ArchModule, NodeCategory, DynamicTrace } from "@/types/graph";
+import type { ArchGraph, ArchModule, NodeCategory, DynamicTrace } from "@/types/graph";
 import type { ChatMessage, FileReference, ToolCallInfo } from "@/types/chat";
 
 const STARTER_QUESTIONS = [
@@ -23,11 +23,12 @@ const TOOL_LABELS: Record<string, string> = {
 };
 
 interface ChatPanelProps {
-  modules: ArchModule[];
+  graph: ArchGraph;
   onFileClick: (filePath: string, moduleId: string, category: NodeCategory) => void;
 }
 
-export function ChatPanel({ modules, onFileClick }: ChatPanelProps) {
+export function ChatPanel({ graph, onFileClick }: ChatPanelProps) {
+  const modules = graph.modules;
   const {
     messages, isStreaming, isOpen,
     addMessage, updateLastAssistant, finalizeLastAssistant,
@@ -106,7 +107,7 @@ export function ChatPanel({ modules, onFileClick }: ChatPanelProps) {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text, context: canvasContext, history }),
+        body: JSON.stringify({ message: text, context: canvasContext, history, graph }),
         signal: controller.signal,
       });
 
