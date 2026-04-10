@@ -5,7 +5,11 @@ import { getCachedGraph, getLatestCachedGraph } from "@/lib/cache";
 import { agentTools, executeTool, buildAgentSystemPrompt } from "@/lib/agent-tools";
 import type { ArchGraph } from "@/types/graph";
 
-const client = new Anthropic();
+let _client: Anthropic | null = null;
+function getClient(): Anthropic {
+  if (!_client) _client = new Anthropic();
+  return _client;
+}
 
 export const maxDuration = 120;
 
@@ -44,6 +48,16 @@ export async function POST(request: NextRequest) {
     });
   }
 
+  let client: Anthropic;
+  try {
+    client = getClient();
+  } catch {
+    return new Response(
+      JSON.stringify({ error: "Anthropic API key not configured. Set ANTHROPIC_API_KEY in your environment." }),
+      { status: 500, headers: { "Content-Type": "application/json" } },
+    );
+  }
+
   const graph = resolveGraph(context);
   if (!graph) {
     return new Response(JSON.stringify({ error: "Graph not found in cache" }), {
@@ -54,6 +68,7 @@ export async function POST(request: NextRequest) {
 
   const systemPrompt = buildAgentSystemPrompt(graph);
   const contextHint = buildContextHint(context);
+  const safeHistory = Array.isArray(history) ? history : [];
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
@@ -66,7 +81,7 @@ export async function POST(request: NextRequest) {
 
       try {
         const messages: Anthropic.MessageParam[] = [
-          ...history.map((h) => ({
+          ...safeHistory.map((h) => ({
             role: h.role as "user" | "assistant",
             content: h.content,
           })),
