@@ -19,7 +19,7 @@ export function ThemeToggle() {
   return (
     <button
       onClick={() => setTheme(isDark ? "light" : "dark")}
-      className="relative w-8 h-8 flex items-center justify-center rounded-lg border border-border text-text-secondary hover:text-foreground hover:border-accent/40 transition-colors cursor-pointer overflow-hidden"
+      className="relative w-8 h-8 flex items-center justify-center rounded-full border border-border text-text-secondary hover:text-foreground hover:border-border-strong transition-colors cursor-pointer overflow-hidden"
       title={isDark ? "Switch to light mode" : "Switch to dark mode"}
     >
       <div

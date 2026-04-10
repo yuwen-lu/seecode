@@ -25,18 +25,18 @@ export function DetailSlider({ level, locked, onLevelChange, onLockedChange, pos
       {/* Lock toggle */}
       <button
         onClick={() => onLockedChange(!locked)}
-        className={`w-7 h-7 flex items-center justify-center rounded-md border transition-colors cursor-pointer ${
+        className={`w-8 h-8 flex items-center justify-center rounded-full border transition-colors cursor-pointer ${
           locked
-            ? "bg-accent/10 border-accent/30 text-accent"
+            ? "bg-surface-2 border-border-strong text-foreground"
             : "bg-surface-1 border-border text-text-tertiary hover:text-text-secondary"
         }`}
         title={locked ? "Unlock: zoom controls detail level" : "Lock: keep current detail level while zooming"}
       >
-        {locked ? <Lock size={12} /> : <Unlock size={12} />}
+        {locked ? <Lock size={14} /> : <Unlock size={14} />}
       </button>
 
       {/* Vertical slider track */}
-      <div className="flex flex-col items-center bg-surface-1 border border-border rounded-lg p-1.5 gap-0.5">
+      <div className="flex flex-col items-center bg-surface-1 border border-border rounded-full p-1.5 gap-0.5">
         {LEVELS.map((l, i) => (
           <button
             key={l.key}
@@ -44,16 +44,16 @@ export function DetailSlider({ level, locked, onLevelChange, onLockedChange, pos
               onLevelChange(l.key);
               if (!locked) onLockedChange(true);
             }}
-            className={`group relative w-6 h-7 flex items-center justify-center rounded transition-colors cursor-pointer ${
+            className={`group relative w-6 h-7 flex items-center justify-center rounded-full transition-colors cursor-pointer ${
               i === activeIndex
-                ? "bg-accent/15"
+                ? "bg-surface-2"
                 : "hover:bg-surface-2"
             }`}
             title={`${l.label}: ${l.short}`}
           >
             <div
               className={`w-1.5 h-1.5 rounded-full transition-colors ${
-                i === activeIndex ? "bg-accent" : "bg-text-tertiary/25"
+                i === activeIndex ? "bg-foreground" : "bg-text-tertiary/25"
               }`}
             />
             <div className={`absolute ${position === "bottom-left" ? "left-full ml-2" : "right-full mr-2"} hidden group-hover:flex items-center whitespace-nowrap pointer-events-none`}>

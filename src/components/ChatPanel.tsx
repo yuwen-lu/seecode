@@ -181,7 +181,7 @@ export function ChatPanel({ modules, onFileClick }: ChatPanelProps) {
       {!isOpen && (
         <button
           onClick={toggleOpen}
-          className="fixed bottom-5 right-5 z-40 p-3 rounded-full bg-surface-1 border border-border text-text-secondary hover:text-foreground hover:border-accent/50 transition-all shadow-lg shadow-black/30 cursor-pointer"
+          className="fixed bottom-5 right-5 z-40 p-3 rounded-full bg-surface-1 border border-border text-text-secondary hover:text-foreground hover:border-border-strong transition-all cursor-pointer"
         >
           <MessageCircle size={18} />
         </button>
@@ -231,7 +231,7 @@ export function ChatPanel({ modules, onFileClick }: ChatPanelProps) {
                       onClick={() => sendMessage(q)}
                       onMouseEnter={() => setInput(q)}
                       onMouseLeave={() => setInput("")}
-                      className="text-left text-xs text-text-secondary hover:text-foreground px-3 py-2 rounded-full border border-border hover:border-accent/30 hover:bg-surface-2/80 transition-colors cursor-pointer"
+                      className="text-left text-xs text-text-secondary hover:text-foreground px-3 py-2 rounded-full border border-border hover:border-border-strong hover:bg-surface-2/80 transition-colors cursor-pointer"
                     >
                       {q}
                     </button>
@@ -253,7 +253,7 @@ export function ChatPanel({ modules, onFileClick }: ChatPanelProps) {
 
           {/* Input */}
           <div className="px-3 py-2.5 shrink-0">
-            <div className="flex items-center gap-2 rounded-2xl border border-border bg-background px-3 py-1.5 focus-within:border-accent/40 transition-colors">
+            <div className="flex items-center gap-2 rounded-2xl border border-border bg-background px-3 py-1.5 focus-within:border-border-strong transition-colors">
               <textarea
                 ref={inputRef}
                 value={input}
@@ -317,7 +317,7 @@ function MessageBubble({ message, fileIndex, onFileClick, isStreaming }: {
                       {fileEntry ? (
                         <button onClick={() => onFileClick(lang, fileEntry.moduleId, fileEntry.category)}
                           className="flex items-center gap-1.5 text-[11px] text-accent hover:text-accent/80 transition-colors">
-                          <FileText size={11} />{lang}
+                          <FileText size={14} />{lang}
                         </button>
                       ) : (
                         <span className="text-[11px] text-text-tertiary">{lang || "code"}</span>
