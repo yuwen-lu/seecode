@@ -94,20 +94,20 @@ function GraphCanvasInner({
   const triggerAnimation = useCallback(() => {
     setAnimClass("react-flow--animating");
     if (animTimer.current) clearTimeout(animTimer.current);
-    animTimer.current = setTimeout(() => setAnimClass(""), 600);
+    animTimer.current = setTimeout(() => setAnimClass(""), 650);
   }, []);
 
-  // Debounced fitView — delayed so morph animation plays first
+  // Debounced fitView — delayed so morph animation mostly settles first
   // Pass nodeIds to scope the fit to specific nodes, or omit to fit all
   const scheduleFitView = useCallback((nodeIds?: string[]) => {
     if (fitViewTimer.current) clearTimeout(fitViewTimer.current);
     fitViewTimer.current = setTimeout(() => {
       if (nodeIds && nodeIds.length > 0) {
-        fitView({ padding: 0.15, duration: 350, nodes: nodeIds.map((id) => ({ id })) });
+        fitView({ padding: 0.3, duration: 700, maxZoom: 1.5, nodes: nodeIds.map((id) => ({ id })) });
       } else {
-        fitView({ padding: 0.12, duration: 350 });
+        fitView({ padding: 0.18, duration: 650 });
       }
-    }, 300);
+    }, 400);
   }, [fitView]);
 
   // All unique categories in the graph
@@ -265,7 +265,7 @@ function GraphCanvasInner({
         setNodes(layout.nodes);
         // Clear morphing class after transition completes
         if (animTimer.current) clearTimeout(animTimer.current);
-        animTimer.current = setTimeout(() => setAnimClass(""), 600);
+        animTimer.current = setTimeout(() => setAnimClass(""), 650);
       });
     });
 
@@ -372,11 +372,11 @@ function GraphCanvasInner({
         if (!detailedModules.has(node.id)) {
           setDetailedModules((prev) => new Set(prev).add(node.id));
         }
-        // Zoom to this node so the detail content is readable
+        // Gently zoom to this node so the detail content is readable
         if (fitViewTimer.current) clearTimeout(fitViewTimer.current);
         fitViewTimer.current = setTimeout(() => {
-          fitView({ padding: 0.35, duration: 400, maxZoom: 1.5, nodes: [{ id: node.id }] });
-        }, 120);
+          fitView({ padding: 0.5, duration: 750, maxZoom: 1.0, nodes: [{ id: node.id }] });
+        }, 100);
       }
     },
     [expandedCategories, detailedModules, triggerAnimation, pushExpansion, scheduleFitView, fitView]

@@ -26,6 +26,7 @@ export const ArchNode = memo(function ArchNode({
 
   const showDetail = zoomLevel === "detailed";
   const showCompact = zoomLevel === "detailed" || zoomLevel === "compact";
+  const hasDetailContent = mod.files.length > 0 || mod.keyTypes.length > 0 || mod.keyMethods.length > 0;
 
   return (
     <>
@@ -52,42 +53,47 @@ export const ArchNode = memo(function ArchNode({
           </p>
         )}
 
-        {/* Files — accent-colored, top-level in hierarchy */}
-        {showDetail && mod.files.length > 0 && (
-          <div className="mt-1.5 space-y-0.5">
-            {mod.files.slice(0, 3).map((f) => {
-              const parts = f.split("/");
-              const display = parts.length > 1 ? parts.slice(1).join("/") : f;
-              return (
-                <div key={f} title={f} className="flex items-center gap-1.5 text-[9px] font-mono truncate" style={{ color: colors.border }}>
-                  <FileCode size={10} className="shrink-0 opacity-70" />
-                  {display}
+        {/* Detail content — always in DOM, animated expand/collapse */}
+        {hasDetailContent && (
+          <div className={`node-detail-expand${showDetail ? " expanded" : ""}`}>
+            <div>
+              {mod.files.length > 0 && (
+                <div className="mt-1.5 space-y-0.5">
+                  {mod.files.slice(0, 3).map((f) => {
+                    const parts = f.split("/");
+                    const display = parts.length > 1 ? parts.slice(1).join("/") : f;
+                    return (
+                      <div key={f} title={f} className="flex items-center gap-1.5 text-[9px] font-mono truncate" style={{ color: colors.border }}>
+                        <FileCode size={10} className="shrink-0 opacity-70" />
+                        {display}
+                      </div>
+                    );
+                  })}
+                  {mod.files.length > 3 && (
+                    <div className="text-[8px] pl-4 opacity-60" style={{ color: colors.border }}>
+                      +{mod.files.length - 3} more
+                    </div>
+                  )}
                 </div>
-              );
-            })}
-            {mod.files.length > 3 && (
-              <div className="text-[8px] pl-4 opacity-60" style={{ color: colors.border }}>
-                +{mod.files.length - 3} more
-              </div>
-            )}
-          </div>
-        )}
+              )}
 
-        {/* Key types & methods — indented under files */}
-        {showDetail && (mod.keyTypes.length > 0 || mod.keyMethods.length > 0) && (
-          <div className="mt-1 ml-4 space-y-px">
-            {mod.keyTypes.slice(0, 4).map((t) => (
-              <div key={t} title={`Type / class: ${t}`} className="flex items-center gap-1 text-[9px] font-mono truncate text-text-tertiary">
-                <Box size={9} className="shrink-0" />
-                {t}
-              </div>
-            ))}
-            {mod.keyMethods.slice(0, 3).map((m) => (
-              <div key={m} title={`Method / function: ${m}`} className="flex items-center gap-1 text-[9px] font-mono truncate text-text-tertiary">
-                <Braces size={9} className="shrink-0" />
-                {m}
-              </div>
-            ))}
+              {(mod.keyTypes.length > 0 || mod.keyMethods.length > 0) && (
+                <div className="mt-1 ml-4 space-y-px">
+                  {mod.keyTypes.slice(0, 4).map((t) => (
+                    <div key={t} title={`Type / class: ${t}`} className="flex items-center gap-1 text-[9px] font-mono truncate text-text-tertiary">
+                      <Box size={9} className="shrink-0" />
+                      {t}
+                    </div>
+                  ))}
+                  {mod.keyMethods.slice(0, 3).map((m) => (
+                    <div key={m} title={`Method / function: ${m}`} className="flex items-center gap-1 text-[9px] font-mono truncate text-text-tertiary">
+                      <Braces size={9} className="shrink-0" />
+                      {m}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
