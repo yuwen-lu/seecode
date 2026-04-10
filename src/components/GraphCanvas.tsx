@@ -425,7 +425,7 @@ function GraphCanvasInner({
           pushExpansion(next);
           scheduleFitView();
 
-          // Marching ants on the landed nodes after morph + zoom settle
+          // Landing glow on the revealed nodes after morph + zoom settle
           const memberIds = graph.modules
             .filter((m) => m.category === category)
             .map((m) => m.id);
@@ -505,7 +505,6 @@ function GraphCanvasInner({
       <ReactFlow
         className={animClass || undefined}
         nodes={(() => {
-          // Pre-compute selection context (constant across all nodes)
           const selectedGroupCategory = selectedNodeId?.startsWith("group-")
             ? selectedNodeId.slice(6) as NodeCategory
             : null;
@@ -514,49 +513,49 @@ function GraphCanvasInner({
             : null;
 
           return nodes.map((n) => {
-          const isSelected = n.id === selectedNodeId ||
-            (n.type === "groupNode" && selectedNodeId
-              ? ((n.data as { members?: ArchModule[] })?.members ?? []).some((m) => m.id === selectedNodeId)
-              : false) ||
-            (selectedGroupCategory && n.type !== "groupNode"
-              ? graph.modules.find((m) => m.id === n.id)?.category === selectedGroupCategory
-              : false);
-          const dimmedBySelection = !!selectedNodeId && !isSelected;
-          const dimmedByTrace = !!traceNodeIds && !traceNodeIds.has(n.id);
+            const isSelected = n.id === selectedNodeId ||
+              (n.type === "groupNode" && selectedNodeId
+                ? ((n.data as { members?: ArchModule[] })?.members ?? []).some((m) => m.id === selectedNodeId)
+                : false) ||
+              (selectedGroupCategory && n.type !== "groupNode"
+                ? graph.modules.find((m) => m.id === n.id)?.category === selectedGroupCategory
+                : false);
+            const dimmedBySelection = !!selectedNodeId && !isSelected;
+            const dimmedByTrace = !!traceNodeIds && !traceNodeIds.has(n.id);
+            const isSibling = !isSelected && n.type !== "groupNode" && (
+              (selectedGroupCategory && graph.modules.find((m) => m.id === n.id)?.category === selectedGroupCategory) ||
+              (selectedModuleCategory && graph.modules.find((m) => m.id === n.id)?.category === selectedModuleCategory)
+            );
 
-          // Sibling: shares parent category with the selected module
-          const isSibling = dimmedBySelection && !!selectedModuleCategory && n.type !== "groupNode"
-            && graph.modules.find((m) => m.id === n.id)?.category === selectedModuleCategory;
+            const traceStepIdx = dynamicTrace
+              ? dynamicTrace.steps.findIndex((s) => s.moduleId === n.id)
+              : -1;
+            const isHoveredTraceNode = hoveredTraceModuleId === n.id;
 
-          const traceStepIdx = dynamicTrace
-            ? dynamicTrace.steps.findIndex((s) => s.moduleId === n.id)
-            : -1;
-          const isHoveredTraceNode = hoveredTraceModuleId === n.id;
-
-          return {
-            ...n,
-            selected: isSelected,
-            data: {
-              ...n.data,
-              dimmed: dimmedByTrace || (dimmedBySelection && !isSibling),
-              sibling: isSibling && !dimmedByTrace,
-              zoomLevel: n.type === "groupNode"
-                ? zoomLevel
-                : detailedModules.has(n.id)
-                  ? "detailed"
-                  : (zoomLevel === "collapsed" ? "compact" : zoomLevel),
-              isDark,
-              marchingAnts: marchingAntNodes.has(n.id),
-              highlighted: chatHighlights?.has(n.id) ||
-                (n.type === "groupNode" && chatHighlights
-                  ? ((n.data as { members?: ArchModule[] })?.members ?? []).some((m) => chatHighlights.has(m.id))
-                  : false),
-              traceStepIndex: traceStepIdx >= 0 ? traceStepIdx : undefined,
-              hoveredFiles: isHoveredTraceNode ? hoveredFiles : undefined,
-              traceActive: !!dynamicTrace && traceStepIdx >= 0,
-            },
-          };
-        });
+            return {
+              ...n,
+              selected: isSelected,
+              data: {
+                ...n.data,
+                dimmed: dimmedByTrace || (dimmedBySelection && !isSibling),
+                sibling: isSibling && !dimmedByTrace,
+                zoomLevel: n.type === "groupNode"
+                  ? zoomLevel
+                  : detailedModules.has(n.id)
+                    ? "detailed"
+                    : (zoomLevel === "collapsed" ? "compact" : zoomLevel),
+                isDark,
+                highlighted: chatHighlights?.has(n.id) ||
+                  (n.type === "groupNode" && chatHighlights
+                    ? ((n.data as { members?: ArchModule[] })?.members ?? []).some((m) => chatHighlights.has(m.id))
+                    : false),
+                marchingAnts: marchingAntNodes.has(n.id),
+                traceStepIndex: traceStepIdx >= 0 ? traceStepIdx : undefined,
+                hoveredFiles: isHoveredTraceNode ? hoveredFiles : undefined,
+                traceActive: !!dynamicTrace && traceStepIdx >= 0,
+              },
+            };
+          });
         })()}
         edges={edges.map((e) => {
           if (!selectedNodeId && !traceNodeIds) return e;

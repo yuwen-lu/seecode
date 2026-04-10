@@ -71,6 +71,7 @@ export const ArchNode = memo(function ArchNode({
           </p>
         )}
 
+        {/* Detail content — always in DOM, animated expand/collapse */}
         {hasDetailContent && (
           <div className={`node-detail-expand${showDetail ? " expanded" : ""}`}>
             <div>
@@ -120,6 +121,7 @@ export const ArchNode = memo(function ArchNode({
           </div>
         )}
 
+        {/* Stats line */}
         {showCompact && (
           <div className="text-[9px] mt-1.5 text-text-tertiary">
             {mod.files.length} file{mod.files.length !== 1 ? "s" : ""}
