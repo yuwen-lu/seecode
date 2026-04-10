@@ -56,8 +56,11 @@ function GraphCanvasInner({
   const [locked, setLocked] = useState(true); // Default locked since we use double-click now
   const prevZoomLevel = useRef<ZoomLevel>("collapsed");
 
-  // Track which categories are expanded (double-click to toggle)
+  // Track which categories are expanded (double-click group to drill down)
   const [expandedCategories, setExpandedCategories] = useState<Set<NodeCategory>>(new Set());
+
+  // Track which individual modules are expanded to detail view (double-click module to drill down)
+  const [detailedModules, setDetailedModules] = useState<Set<string>>(new Set());
 
   // Undo/redo history for expandedCategories
   const undoStack = useRef<Set<NodeCategory>[]>([]);
@@ -346,7 +349,7 @@ function GraphCanvasInner({
     [graph.modules, onSelect]
   );
 
-  // Double-click: only drill down (never collapse, never close panel)
+  // Double-click: drill down one level (never collapse, never close panel)
   const onNodeDoubleClick = useCallback(
     (_: React.MouseEvent, node: Node) => {
       if (clickTimer.current) {
@@ -355,7 +358,7 @@ function GraphCanvasInner({
       }
 
       if (node.type === "groupNode") {
-        // Expand this group (drill down)
+        // Expand this group (drill down to module level)
         const category = (node.data as GroupNodeData).category as NodeCategory;
         if (!expandedCategories.has(category)) {
           const next = new Set(expandedCategories);
@@ -365,14 +368,18 @@ function GraphCanvasInner({
           scheduleFitView();
         }
       } else {
-        // Double-click module → open module panel
-        const mod = graph.modules.find((m) => m.id === node.id);
-        if (mod) {
-          onSelect({ kind: "module", module: mod });
+        // Expand this module to detail level (local, not global)
+        if (!detailedModules.has(node.id)) {
+          setDetailedModules((prev) => new Set(prev).add(node.id));
         }
+        // Zoom to this node so the detail content is readable
+        if (fitViewTimer.current) clearTimeout(fitViewTimer.current);
+        fitViewTimer.current = setTimeout(() => {
+          fitView({ padding: 0.35, duration: 400, maxZoom: 1.5, nodes: [{ id: node.id }] });
+        }, 120);
       }
     },
-    [graph.modules, expandedCategories, onSelect, triggerAnimation, pushExpansion, scheduleFitView]
+    [expandedCategories, detailedModules, triggerAnimation, pushExpansion, scheduleFitView, fitView]
   );
 
   const onPaneClick = useCallback(() => {
@@ -391,6 +398,7 @@ function GraphCanvasInner({
   function handleLevelChange(level: ZoomLevel) {
     prevZoomLevel.current = level;
     setZoomLevel(level);
+    setDetailedModules(new Set());
     // When switching to system view, clear all expansions
     if (level === "collapsed") {
       setExpandedCategories(new Set());
@@ -445,8 +453,12 @@ function GraphCanvasInner({
             data: {
               ...n.data,
               dimmed: dimmedBySelection || dimmedByTrace,
-              // Individual nodes always show at least compact; group nodes stay collapsed
-              zoomLevel: n.type === "groupNode" ? zoomLevel : (zoomLevel === "collapsed" ? "compact" : zoomLevel),
+              // Per-node detail override, otherwise at least compact for individual nodes
+              zoomLevel: n.type === "groupNode"
+                ? zoomLevel
+                : detailedModules.has(n.id)
+                  ? "detailed"
+                  : (zoomLevel === "collapsed" ? "compact" : zoomLevel),
               isDark,
               highlighted: chatHighlights?.has(n.id) ||
                 (n.type === "groupNode" && chatHighlights
