@@ -1,8 +1,15 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { ExtractionResult } from "./extractors";
 import type { SourceFile } from "./repo";
-import type { ArchGraph, ArchModule, ArchEdge } from "@/types/graph";
+import type { ArchModule, ArchEdge, NodeCategory } from "@/types/graph";
 import fs from "fs";
+import path from "path";
+import {
+  analyzeWithAST,
+  classifyModuleEdge,
+  countLines,
+  type ASTAnalysisResult,
+} from "./ast-analyzer";
 
 const client = new Anthropic();
 
@@ -11,7 +18,61 @@ interface LLMAnalysisResult {
   edges: ArchEdge[];
 }
 
-export { buildStructureSummary, buildPrompt, parseResponse, enrichModulesWithFiles };
+export {
+  buildStructureSummary,
+  buildPrompt,
+  buildHybridPrompt,
+  parseResponse,
+  enrichModulesWithFiles,
+  reconcileLLMWithAST,
+};
+
+/**
+ * Hybrid analysis: use AST parsing for the factual baseline, then ask the LLM
+ * only to improve semantic grouping, naming, responsibilities, categories, and
+ * optional higher-level edge labels. The final result is reconciled back against
+ * AST/source-file facts so canvas data stays render-safe and non-hallucinated.
+ */
+export async function analyzeWithHybridStreaming(
+  extraction: ExtractionResult,
+  sourceFiles: SourceFile[],
+  repoName: string,
+  onChunk: (text: string) => void,
+  onFallback?: (message: string) => void,
+): Promise<LLMAnalysisResult> {
+  const astBaseline = analyzeWithAST(extraction, sourceFiles);
+  // Facts only — the LLM refines the AST graph, it never reads raw source
+  const structureSummary = buildStructureSummary(extraction, sourceFiles, { includeRawSource: false });
+  const prompt = buildHybridPrompt(structureSummary, astBaseline, repoName);
+
+  try {
+    const stream = await client.messages.stream({
+      model: "claude-sonnet-4-6",
+      max_tokens: 20000,
+      messages: [
+        {
+          role: "user",
+          content: prompt,
+        },
+      ],
+    });
+
+    let fullText = "";
+    for await (const event of stream) {
+      if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
+        fullText += event.delta.text;
+        onChunk(event.delta.text);
+      }
+    }
+
+    const llmResult = parseResponse(fullText);
+    return reconcileLLMWithAST(llmResult, astBaseline, extraction, sourceFiles);
+  } catch (err) {
+    console.warn("Hybrid LLM refinement failed; falling back to AST baseline:", err);
+    onFallback?.("Claude refinement unavailable — using the deterministic AST graph.");
+    return astBaseline;
+  }
+}
 
 /**
  * Streaming version — yields text chunks as they arrive, then returns the final parsed result.
@@ -51,7 +112,9 @@ export async function analyzeWithLLMStreaming(
 function buildStructureSummary(
   extraction: ExtractionResult,
   sourceFiles: SourceFile[],
+  options: { includeRawSource?: boolean } = {},
 ): string {
+  const { includeRawSource = true } = options;
   const parts: string[] = [];
 
   // Files with Tree-sitter extraction
@@ -95,11 +158,18 @@ function buildStructureSummary(
     }
   }
 
-  // Files without Tree-sitter extraction — include raw source
+  // Files without Tree-sitter extraction. In facts-only mode (hybrid path)
+  // just list their paths; otherwise include raw source for LLM analysis.
   const extractedPaths = new Set(extraction.files.map((f) => f.filePath));
   const unextracted = sourceFiles.filter((f) => !extractedPaths.has(f.relativePath));
 
-  if (unextracted.length > 0) {
+  if (unextracted.length > 0 && !includeRawSource) {
+    parts.push("## Other Source Files (no AST extraction available)\n");
+    for (const sf of unextracted) {
+      parts.push(`- ${sf.relativePath} [${sf.language}]`);
+    }
+    parts.push("");
+  } else if (unextracted.length > 0) {
     parts.push("## Raw Source Files (no AST extraction available)\n");
     for (const sf of unextracted) {
       try {
@@ -148,6 +218,65 @@ Respond in EXACTLY this format (no other text):
 \`\`\`
 
 Here is the code structure:
+
+${structureSummary}`;
+}
+
+function buildHybridPrompt(
+  structureSummary: string,
+  astBaseline: ASTAnalysisResult,
+  repoName: string,
+): string {
+  return `You are refining the architecture graph for the GitHub repository "${repoName}".
+
+We already built a deterministic graph from Tree-sitter AST parsing. Treat that AST graph as the source of truth for:
+- exact relative file paths
+- classes, functions, methods, exports, and imports
+- internal file dependency facts
+
+Your job is only to improve the semantic architecture view for the canvas:
+- merge or split AST modules into logical product/architecture components when it improves comprehension
+- improve names, categories, one-sentence responsibilities, keyTypes, and keyMethods
+- optionally improve edge type/label when the AST dependency edge has a clearer architectural meaning
+
+Hard validation rules:
+- Return ONLY a JSON code block in the requested shape.
+- Use only these categories: core, api-client, data, visual, utility, config, external, proxy, voice.
+- Every source file from the AST/source summary must appear in exactly one module files array.
+- Do not invent files, module ids referenced by edges, classes, or methods.
+- Prefer 5-12 modules for medium repos; fewer for tiny repos.
+- Edge endpoints must use module ids from your modules array.
+- Edge type must be one of: owns, depends, dataflow, weak.
+- Only include edges backed by an actual dependency in the AST graph (re-typed or re-labeled is fine); edges with no underlying import relationship will be discarded.
+
+Current deterministic AST graph:
+\`\`\`json
+${JSON.stringify(astBaseline)}
+\`\`\`
+
+Respond in EXACTLY this format (no other text):
+
+\`\`\`json
+{
+  "modules": [
+    {
+      "id": "kebab-case-id",
+      "name": "Human Name",
+      "category": "core",
+      "responsibility": "One sentence.",
+      "files": ["src/path/to/file.ts"],
+      "keyTypes": ["TypeName"],
+      "keyMethods": ["methodName()"],
+      "lineCount": 123
+    }
+  ],
+  "edges": [
+    { "from": "module-id", "to": "module-id", "type": "depends", "label": "uses X" }
+  ]
+}
+\`\`\`
+
+Here is the AST-extracted source structure:
 
 ${structureSummary}`;
 }
@@ -264,6 +393,229 @@ function enrichModulesWithFiles(
       }
     }
   }
+}
+
+const VALID_CATEGORIES = new Set<NodeCategory>([
+  "core",
+  "voice",
+  "visual",
+  "api-client",
+  "proxy",
+  "external",
+  "utility",
+  "data",
+  "config",
+]);
+
+const VALID_EDGE_TYPES = new Set<ArchEdge["type"]>(["owns", "depends", "dataflow", "weak"]);
+
+function reconcileLLMWithAST(
+  llmResult: LLMAnalysisResult,
+  astBaseline: ASTAnalysisResult,
+  extraction: ExtractionResult,
+  sourceFiles: SourceFile[],
+): LLMAnalysisResult {
+  const allFiles = sourceFiles.map((sf) => normalizePath(sf.relativePath));
+  if (allFiles.length === 0 || llmResult.modules.length === 0) return astBaseline;
+
+  const validFiles = new Set(allFiles);
+  const baselineByFile = new Map<string, ArchModule>();
+  for (const mod of astBaseline.modules) {
+    for (const file of mod.files) baselineByFile.set(normalizePath(file), mod);
+  }
+
+  const lineCounts = countLines(sourceFiles);
+  const usedIds = new Set<string>();
+  const assigned = new Set<string>();
+  const modules: ArchModule[] = [];
+
+  for (const raw of llmResult.modules) {
+    const files = dedupeStrings((raw.files ?? []).map(normalizePath))
+      .filter((f) => validFiles.has(f) && !assigned.has(f));
+    if (files.length === 0) continue;
+
+    for (const file of files) assigned.add(file);
+    const fallback = baselineByFile.get(files[0]);
+    const id = uniqueId(slugify(raw.id || raw.name || fallback?.id || "module"), usedIds);
+    modules.push({
+      id,
+      name: safeString(raw.name) || fallback?.name || titleFromId(id),
+      category: isNodeCategory(raw.category) ? raw.category : fallback?.category ?? "core",
+      responsibility: safeString(raw.responsibility)
+        || fallback?.responsibility
+        || `${files.length} source file${files.length === 1 ? "" : "s"}.`,
+      files,
+      keyTypes: sanitizeStringArray(raw.keyTypes, fallback?.keyTypes),
+      keyMethods: sanitizeStringArray(raw.keyMethods, fallback?.keyMethods),
+      lineCount: files.reduce((sum, f) => sum + (lineCounts.get(f) ?? 0), 0),
+    });
+  }
+
+  if (modules.length === 0) return astBaseline;
+
+  for (const file of allFiles) {
+    if (assigned.has(file)) continue;
+    const fallback = baselineByFile.get(file);
+    const target = findBestModuleForUnassignedFile(modules, fallback);
+    if (target) {
+      target.files.push(file);
+      target.lineCount = (target.lineCount ?? 0) + (lineCounts.get(file) ?? 0);
+      assigned.add(file);
+      continue;
+    }
+
+    const id = uniqueId(slugify(fallback?.id || path.posix.dirname(file) || "module"), usedIds);
+    modules.push({
+      id,
+      name: fallback?.name || titleFromId(id),
+      category: fallback?.category ?? "core",
+      responsibility: fallback?.responsibility || `Contains ${file}.`,
+      files: [file],
+      keyTypes: fallback?.keyTypes ?? [],
+      keyMethods: fallback?.keyMethods ?? [],
+      lineCount: lineCounts.get(file) ?? 0,
+    });
+    assigned.add(file);
+  }
+
+  if (modules.length === 0) return astBaseline;
+
+  const edges = reconcileEdges(llmResult.edges, modules, extraction);
+  return { modules, edges };
+}
+
+function reconcileEdges(
+  llmEdges: ArchEdge[],
+  modules: ArchModule[],
+  extraction: ExtractionResult,
+): ArchEdge[] {
+  const moduleIds = new Set(modules.map((m) => m.id));
+  const filesByModule = new Map<string, string[]>();
+  const fileToModule = new Map<string, string>();
+  for (const mod of modules) {
+    const files = mod.files.map(normalizePath);
+    filesByModule.set(mod.id, files);
+    for (const file of files) fileToModule.set(file, mod.id);
+  }
+
+  // The factual edge set: module pairs connected by an actual file-level dependency
+  const dependencyNames = new Map<string, string[]>();
+  for (const edge of extraction.dependencyEdges) {
+    const from = fileToModule.get(normalizePath(edge.fromFile));
+    const to = fileToModule.get(normalizePath(edge.toFile));
+    if (!from || !to || from === to) continue;
+    const key = edgeKey(from, to);
+    dependencyNames.set(key, [...(dependencyNames.get(key) ?? []), ...edge.importedNames]);
+  }
+
+  // LLM edges may only re-type/re-label real dependencies, never invent new ones
+  const llmByPair = new Map<string, ArchEdge>();
+  for (const edge of llmEdges) {
+    if (!moduleIds.has(edge.from) || !moduleIds.has(edge.to) || edge.from === edge.to) continue;
+    const key = edgeKey(edge.from, edge.to);
+    if (!dependencyNames.has(key) || llmByPair.has(key)) continue;
+    llmByPair.set(key, {
+      from: edge.from,
+      to: edge.to,
+      type: isEdgeType(edge.type) ? edge.type : "depends",
+      label: safeString(edge.label) || undefined,
+    });
+  }
+
+  const extractedByPath = new Map(extraction.files.map((f) => [f.filePath, f]));
+  const edges: ArchEdge[] = [];
+
+  for (const [key, names] of dependencyNames) {
+    const [from, to] = key.split("\u0000");
+    const llm = llmByPair.get(key);
+    const uniqueNames = dedupeStrings(names).filter(Boolean);
+    edges.push({
+      from,
+      to,
+      type: llm?.type
+        ?? classifyModuleEdge(filesByModule.get(from)!, filesByModule.get(to)!, uniqueNames, extractedByPath),
+      label: llm?.label ?? (uniqueNames.length > 0 ? listLabels(uniqueNames, 3) : undefined),
+    });
+  }
+
+  return edges.sort((a, b) => `${a.from}:${a.to}`.localeCompare(`${b.from}:${b.to}`));
+}
+
+function findBestModuleForUnassignedFile(
+  modules: ArchModule[],
+  fallback?: ArchModule,
+): ArchModule | undefined {
+  if (!fallback) {
+    return modules.find((m) => m.category === "utility" || m.category === "config") ?? modules[0];
+  }
+
+  return modules.find((m) => m.id === fallback.id)
+    ?? modules.find((m) => m.name === fallback.name)
+    ?? modules.find((m) => m.category === fallback.category)
+    ?? modules[0];
+}
+
+function isNodeCategory(value: unknown): value is NodeCategory {
+  return typeof value === "string" && VALID_CATEGORIES.has(value as NodeCategory);
+}
+
+function isEdgeType(value: unknown): value is ArchEdge["type"] {
+  return typeof value === "string" && VALID_EDGE_TYPES.has(value as ArchEdge["type"]);
+}
+
+function sanitizeStringArray(value: unknown, fallback: string[] = []): string[] {
+  if (!Array.isArray(value)) return fallback;
+  const items = value.filter(
+    (item): item is string => typeof item === "string" && item.trim().length > 0,
+  );
+  return dedupeStrings(items).slice(0, 12);
+}
+
+function safeString(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function normalizePath(filePath: string): string {
+  return filePath.split(path.sep).join("/");
+}
+
+function slugify(value: string): string {
+  const slug = value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return slug || "module";
+}
+
+function uniqueId(base: string, used: Set<string>): string {
+  let id = base;
+  let n = 2;
+  while (used.has(id)) id = `${base}-${n++}`;
+  used.add(id);
+  return id;
+}
+
+function titleFromId(id: string): string {
+  return id
+    .split("-")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ") || "Module";
+}
+
+function dedupeStrings(items: string[]): string[] {
+  return [...new Set(items)];
+}
+
+function edgeKey(from: string, to: string): string {
+  return `${from}\u0000${to}`;
+}
+
+function listLabels(names: string[], max: number): string {
+  const shown = names.slice(0, max).join(", ");
+  const more = names.length - max;
+  return more > 0 ? `${shown} and ${more} more` : shown;
 }
 
 function parseResponse(text: string): LLMAnalysisResult {

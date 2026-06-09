@@ -19,6 +19,17 @@ interface RepoEntry {
 
 const RECENT_REPOS_KEY = "seecode:recent-repos";
 
+/** Repos the AST parsing pipeline is continuously tested against (see parsing.integration.test.ts) */
+const EXAMPLE_REPOS: { name: string; url: string; language: string }[] = [
+  { name: "expressjs/express", url: "https://github.com/expressjs/express", language: "JavaScript" },
+  { name: "axios/axios", url: "https://github.com/axios/axios", language: "JavaScript" },
+  { name: "pmndrs/zustand", url: "https://github.com/pmndrs/zustand", language: "TypeScript" },
+  { name: "honojs/hono", url: "https://github.com/honojs/hono", language: "TypeScript" },
+  { name: "pallets/flask", url: "https://github.com/pallets/flask", language: "Python" },
+  { name: "gin-gonic/gin", url: "https://github.com/gin-gonic/gin", language: "Go" },
+  { name: "tokio-rs/bytes", url: "https://github.com/tokio-rs/bytes", language: "Rust" },
+];
+
 function getRecentRepos(): RepoEntry[] {
   try {
     return JSON.parse(localStorage.getItem(RECENT_REPOS_KEY) ?? "[]");
@@ -97,7 +108,7 @@ export default function Home() {
     });
   }
 
-  // Auto-load demo graph on mount (analysis disabled on prod for now)
+  // Auto-load demo graph on mount; the seecode logo (goHome) returns to the home view
   useEffect(() => {
     if (!graph) loadGraph(MOCK_CLICKY);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -250,7 +261,6 @@ export default function Home() {
 
         {/* Canvas — fills full space */}
         <div className="absolute inset-0">
-          {/* HomeView and analysis flow disabled on prod — git clone not available on Vercel serverless
           {showHome && (
             <HomeView onAnalyze={analyzeRepo} mockGraph={MOCK_CLICKY} onLoadGraph={loadGraph} />
           )}
@@ -281,7 +291,6 @@ export default function Home() {
               </div>
             </div>
           )}
-          End of disabled HomeView/analysis block */}
 
           {graph && (
             <GraphCanvas
@@ -354,8 +363,8 @@ function HomeView({
   }
 
   return (
-    <div className="absolute inset-0 flex items-start justify-center pt-[18vh]">
-      <div className="w-full max-w-md px-6">
+    <div className="absolute inset-0 flex items-start justify-center pt-[18vh] overflow-y-auto">
+      <div className="w-full max-w-md px-6 pb-12">
         <h2 className="text-lg font-semibold text-foreground mb-1">
           Understand any codebase
         </h2>
@@ -413,6 +422,28 @@ function HomeView({
                 </span>
                 <span className="text-[11px] text-text-tertiary shrink-0">
                   {formatRelativeTime(repo.analyzedAt)}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-8">
+          <h3 className="text-[10px] font-medium uppercase tracking-wider text-text-tertiary mb-2">
+            Examples
+          </h3>
+          <div className="space-y-0.5">
+            {EXAMPLE_REPOS.map((repo) => (
+              <button
+                key={repo.url}
+                onClick={() => onAnalyze(repo.url)}
+                className="w-full text-left px-3 py-2 rounded-lg hover:bg-surface-1 transition-colors cursor-pointer group flex items-center justify-between gap-3"
+              >
+                <span className="text-sm text-foreground group-hover:text-accent transition-colors truncate">
+                  {repo.name}
+                </span>
+                <span className="text-[11px] text-text-tertiary shrink-0">
+                  {repo.language}
                 </span>
               </button>
             ))}
