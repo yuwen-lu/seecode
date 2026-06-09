@@ -2,6 +2,7 @@ import { execSync } from "child_process";
 import fs from "fs";
 import path from "path";
 import os from "os";
+import * as tar from "tar";
 
 /** Supported source file extensions grouped by language */
 const LANGUAGE_EXTENSIONS: Record<string, string[]> = {
@@ -100,8 +101,18 @@ export function cloneRepo(cloneUrl: string, repoName: string): { repoDir: string
   } catch (err) {
     // Cleanup on failure
     fs.rmSync(tmpDir, { recursive: true, force: true });
+    const stderr = (err as { stderr?: Buffer }).stderr?.toString().trim() ?? "";
+    const code = (err as { code?: string }).code;
+    console.error(`git clone failed for ${cloneUrl} (code: ${code ?? "n/a"}):`, stderr || err);
+
+    if (code === "ENOENT") {
+      throw new Error("git is not available in this environment.");
+    }
+    if (/not found|does not exist|access denied|authentication/i.test(stderr)) {
+      throw new Error("Repository not found. Make sure it exists and is public.");
+    }
     throw new Error(
-      `Failed to clone repository. Make sure it exists and is public.`
+      `Failed to clone repository${stderr ? `: ${firstLine(stderr)}` : ". Make sure it exists and is public."}`
     );
   }
 
@@ -115,6 +126,115 @@ export function cloneRepo(cloneUrl: string, repoName: string): { repoDir: string
   }
 
   return { repoDir, commitSha };
+}
+
+function firstLine(text: string): string {
+  return text.split("\n")[0];
+}
+
+let gitAvailable: boolean | null = null;
+
+/** Whether the git binary exists (it doesn't on Vercel serverless). Cached per process. */
+export function isGitAvailable(): boolean {
+  if (gitAvailable === null) {
+    try {
+      execSync("git --version", { stdio: "pipe", timeout: 10_000 });
+      gitAvailable = true;
+    } catch {
+      gitAvailable = false;
+    }
+  }
+  return gitAvailable;
+}
+
+function githubHeaders(extra: Record<string, string> = {}): Record<string, string> {
+  const headers: Record<string, string> = { "User-Agent": "seecode", ...extra };
+  if (process.env.GITHUB_TOKEN) {
+    headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
+  }
+  return headers;
+}
+
+/**
+ * Download and extract a repo's default-branch tarball from GitHub.
+ * Works without the git binary (e.g. on Vercel serverless).
+ */
+export async function downloadRepoTarball(
+  owner: string,
+  repo: string,
+): Promise<{ repoDir: string; commitSha: string }> {
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "seecode-"));
+
+  try {
+    const tarballUrl = `https://codeload.github.com/${owner}/${repo}/tar.gz/HEAD`;
+    const res = await fetch(tarballUrl, { headers: githubHeaders() });
+
+    if (res.status === 404) {
+      throw new Error("Repository not found. Make sure it exists and is public.");
+    }
+    if (!res.ok || !res.body) {
+      console.error(`Tarball download failed for ${owner}/${repo}: HTTP ${res.status}`);
+      throw new Error(`Failed to download repository from GitHub (HTTP ${res.status}).`);
+    }
+
+    const tarPath = path.join(tmpDir, "repo.tar.gz");
+    fs.writeFileSync(tarPath, Buffer.from(await res.arrayBuffer()));
+    await tar.x({ file: tarPath, cwd: tmpDir });
+    fs.rmSync(tarPath);
+
+    // The tarball contains a single root directory (e.g. "repo-HEAD")
+    const roots = fs
+      .readdirSync(tmpDir, { withFileTypes: true })
+      .filter((e) => e.isDirectory());
+    if (roots.length !== 1) {
+      throw new Error(`Unexpected tarball layout for ${owner}/${repo} (${roots.length} root dirs).`);
+    }
+
+    const repoDir = path.join(tmpDir, roots[0].name);
+    const commitSha = await fetchHeadSha(owner, repo);
+    return { repoDir, commitSha };
+  } catch (err) {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+    throw err;
+  }
+}
+
+/** Resolve the default branch's HEAD commit SHA via the GitHub API. */
+async function fetchHeadSha(owner: string, repo: string): Promise<string> {
+  try {
+    const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/commits/HEAD`, {
+      headers: githubHeaders({ Accept: "application/vnd.github.sha" }),
+    });
+    if (res.ok) return (await res.text()).trim();
+    console.warn(`Could not resolve HEAD SHA for ${owner}/${repo}: HTTP ${res.status} (rate limit?)`);
+  } catch (err) {
+    console.warn(`Could not resolve HEAD SHA for ${owner}/${repo}:`, err);
+  }
+  return "unknown";
+}
+
+/**
+ * Fetch a repo by whatever means the environment supports:
+ * git clone when the binary exists, GitHub tarball download otherwise
+ * (or when the clone fails for a reason other than a missing repo).
+ */
+export async function acquireRepo(
+  owner: string,
+  repo: string,
+  cloneUrl: string,
+): Promise<{ repoDir: string; commitSha: string; method: "git" | "tarball" }> {
+  if (isGitAvailable()) {
+    try {
+      return { ...cloneRepo(cloneUrl, repo), method: "git" };
+    } catch (err) {
+      if (err instanceof Error && err.message.startsWith("Repository not found")) throw err;
+      console.warn(`git clone failed for ${owner}/${repo}; falling back to tarball download:`, err);
+    }
+  } else {
+    console.warn("git is not available in this environment; using GitHub tarball download");
+  }
+
+  return { ...(await downloadRepoTarball(owner, repo)), method: "tarball" };
 }
 
 /**
@@ -198,10 +318,10 @@ export function cleanupRepo(repoDir: string) {
 /**
  * Full repo ingestion: parse URL, clone, discover files, detect language.
  */
-export function ingestRepo(url: string): RepoInfo {
+export async function ingestRepo(url: string): Promise<RepoInfo> {
   const { owner, repo, cloneUrl } = parseGitHubUrl(url);
   const repoName = `${owner}/${repo}`;
-  const { repoDir, commitSha } = cloneRepo(cloneUrl, repo);
+  const { repoDir, commitSha } = await acquireRepo(owner, repo, cloneUrl);
   const files = discoverFiles(repoDir);
   const primaryLanguage = detectPrimaryLanguage(files);
 

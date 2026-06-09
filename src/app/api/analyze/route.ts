@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { parseGitHubUrl, cloneRepo, discoverFiles, detectPrimaryLanguage, cleanupRepo } from "@/lib/repo";
+import { parseGitHubUrl, acquireRepo, discoverFiles, detectPrimaryLanguage, cleanupRepo } from "@/lib/repo";
 import { extractAll } from "@/lib/extractors";
 import { canAnalyzeWithAST } from "@/lib/ast-analyzer";
 import { analyzeWithLLMStreaming, analyzeWithHybridStreaming } from "@/lib/llm-analyzer";
@@ -14,7 +14,12 @@ export async function POST(request: NextRequest) {
   const encoder = new TextEncoder();
   const stream = new ReadableStream({
     async start(controller) {
+      let currentStep = "init";
+
       function send(event: string, data: unknown) {
+        if (event === "status" && data && typeof data === "object" && "step" in data) {
+          currentStep = String((data as { step: unknown }).step);
+        }
         controller.enqueue(
           encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
         );
@@ -30,13 +35,14 @@ export async function POST(request: NextRequest) {
           return;
         }
 
-        // Step 1: Clone
-        send("status", { step: "cloning", message: "Cloning repository..." });
+        // Step 1: Fetch the repo (git clone locally, tarball download on serverless)
+        send("status", { step: "cloning", message: "Fetching repository..." });
         const { owner, repo, cloneUrl } = parseGitHubUrl(url);
         const repoName = `${owner}/${repo}`;
-        const cloneResult = cloneRepo(cloneUrl, repo);
+        const cloneResult = await acquireRepo(owner, repo, cloneUrl);
         repoDir = cloneResult.repoDir;
         const commitSha = cloneResult.commitSha;
+        console.log(`Fetched ${repoName} via ${cloneResult.method} (commit: ${commitSha})`);
 
         // Step 2: Check cache
         const cached = getCachedGraph(url, commitSha);
@@ -117,8 +123,8 @@ export async function POST(request: NextRequest) {
         send("result", graph);
       } catch (err) {
         const message = err instanceof Error ? err.message : "Internal server error";
-        console.error("Analysis error:", err);
-        send("error", { error: message });
+        console.error(`Analysis error (step: ${currentStep}):`, err);
+        send("error", { error: message, step: currentStep });
       } finally {
         if (repoDir) {
           cleanupRepo(repoDir);

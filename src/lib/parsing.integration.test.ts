@@ -12,7 +12,7 @@ import { execSync } from "child_process";
 import fs from "fs";
 import os from "os";
 import path from "path";
-import { discoverFiles, detectPrimaryLanguage } from "./repo";
+import { discoverFiles, detectPrimaryLanguage, downloadRepoTarball, acquireRepo } from "./repo";
 import { extractAll, TREE_SITTER_LANGUAGES } from "./extractors";
 import { analyzeWithAST } from "./ast-analyzer";
 
@@ -108,4 +108,41 @@ describe.skipIf(!enabled)("AST parsing against popular open-source repos", () =>
     },
     180_000,
   );
+});
+
+// Vercel serverless has no git binary; the tarball download path is what
+// production uses. Run the full pipeline through it.
+describe.skipIf(!enabled)("repo acquisition without git (serverless path)", () => {
+  it("downloads a tarball and runs the full pipeline on it", async () => {
+    const { repoDir, commitSha } = await downloadRepoTarball("tokio-rs", "bytes");
+    cloneDirs.push(path.dirname(repoDir));
+
+    expect(commitSha).toMatch(/^([0-9a-f]{40}|unknown)$/);
+
+    const files = discoverFiles(repoDir);
+    expect(files.length).toBeGreaterThan(0);
+    expect(detectPrimaryLanguage(files)).toBe("rust");
+
+    const result = analyzeWithAST(extractAll(files), files);
+    expect(result.modules.length).toBeGreaterThan(0);
+    expect(result.modules.flatMap((m) => m.files).sort())
+      .toEqual(files.map((f) => f.relativePath).sort());
+  }, 180_000);
+
+  it("reports a clear error for nonexistent repos", async () => {
+    await expect(downloadRepoTarball("yuwen-lu", "this-repo-does-not-exist-xyz"))
+      .rejects.toThrow(/Repository not found/);
+  }, 60_000);
+
+  it("acquireRepo returns a usable repo regardless of fetch method", async () => {
+    const { repoDir, method } = await acquireRepo(
+      "pmndrs",
+      "zustand",
+      "https://github.com/pmndrs/zustand.git",
+    );
+    cloneDirs.push(path.dirname(repoDir));
+
+    expect(["git", "tarball"]).toContain(method);
+    expect(discoverFiles(repoDir).length).toBeGreaterThan(0);
+  }, 180_000);
 });
