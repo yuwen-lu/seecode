@@ -69,10 +69,10 @@ export async function POST(request: NextRequest) {
         });
 
         // Step 4: Architecture analysis.
-        // TypeScript/JavaScript repos use a hybrid workflow: deterministic AST
-        // facts first, then LLM semantic refinement with AST fallback. Other
-        // languages continue to use the existing LLM analysis over extracted AST
-        // summaries/raw snippets.
+        // Repos in Tree-sitter-supported languages (TS/JS/Python/Go/Rust) use a
+        // hybrid workflow: deterministic AST facts first, then LLM semantic
+        // refinement with AST fallback. Other languages continue to use the
+        // existing LLM analysis over extracted AST summaries/raw snippets.
         let analysis: { modules: ArchGraph["modules"]; edges: ArchGraph["edges"] };
 
         if (canAnalyzeWithAST(primaryLanguage)) {

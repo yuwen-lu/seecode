@@ -1,6 +1,6 @@
 import fs from "fs";
 import path from "path";
-import type { ExtractionResult, ExtractedFile } from "./extractors";
+import { TREE_SITTER_LANGUAGES, type ExtractionResult, type ExtractedFile } from "./extractors";
 import type { SourceFile } from "./repo";
 import type { ArchModule, ArchEdge, NodeCategory } from "@/types/graph";
 
@@ -9,15 +9,12 @@ export interface ASTAnalysisResult {
   edges: ArchEdge[];
 }
 
-/** Languages the deterministic analyzer fully supports. */
-const SUPPORTED_LANGUAGES = new Set(["typescript", "javascript"]);
-
 /**
  * Whether a repo can be analyzed deterministically (without an LLM).
- * Currently limited to TypeScript/JavaScript codebases.
+ * Supported for every language with a Tree-sitter extractor.
  */
 export function canAnalyzeWithAST(primaryLanguage: string): boolean {
-  return SUPPORTED_LANGUAGES.has(primaryLanguage);
+  return TREE_SITTER_LANGUAGES.has(primaryLanguage);
 }
 
 /**
@@ -179,13 +176,13 @@ function toPosix(p: string): string {
 
 const CATEGORY_KEYWORDS: [NodeCategory, string[]][] = [
   ["voice", ["voice", "audio", "speech", "sound", "tts", "stt"]],
-  ["visual", ["components", "component", "ui", "views", "view", "pages", "screens", "widgets"]],
-  ["proxy", ["api", "server", "middleware", "routes", "controllers", "endpoints"]],
+  ["visual", ["components", "component", "ui", "views", "view", "pages", "screens", "widgets", "templates", "frontend"]],
+  ["proxy", ["api", "server", "middleware", "routes", "router", "controllers", "handlers", "endpoints"]],
   ["api-client", ["client", "clients", "sdk", "services", "agents", "agent", "llm", "ai"]],
-  ["data", ["types", "models", "model", "schemas", "schema", "entities", "store", "stores", "state", "data", "db", "database"]],
+  ["data", ["types", "models", "model", "schemas", "schema", "entities", "store", "stores", "state", "data", "db", "database", "migrations", "repositories", "orm"]],
   ["config", ["config", "configs", "settings", "constants", "env"]],
-  ["utility", ["utils", "util", "helpers", "helper", "lib", "libs", "shared", "common", "hooks", "tools", "scripts"]],
-  ["core", ["core", "engine", "domain", "main", "app"]],
+  ["utility", ["utils", "util", "helpers", "helper", "lib", "libs", "shared", "common", "hooks", "tools", "scripts", "tests", "test", "examples", "benchmarks", "benches"]],
+  ["core", ["core", "engine", "domain", "main", "app", "cmd", "internal", "runtime"]],
 ];
 
 function inferCategory(dir: string, files: string[]): NodeCategory {

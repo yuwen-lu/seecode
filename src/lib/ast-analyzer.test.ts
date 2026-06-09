@@ -27,14 +27,17 @@ function extracted(overrides: Partial<ExtractedFile> & { filePath: string }): Ex
 const emptyExtraction: ExtractionResult = { files: [], dependencyEdges: [] };
 
 describe("canAnalyzeWithAST", () => {
-  it("supports typescript and javascript", () => {
+  it("supports every tree-sitter language", () => {
     expect(canAnalyzeWithAST("typescript")).toBe(true);
     expect(canAnalyzeWithAST("javascript")).toBe(true);
+    expect(canAnalyzeWithAST("python")).toBe(true);
+    expect(canAnalyzeWithAST("go")).toBe(true);
+    expect(canAnalyzeWithAST("rust")).toBe(true);
   });
 
-  it("rejects other languages", () => {
-    expect(canAnalyzeWithAST("python")).toBe(false);
+  it("rejects languages without an extractor", () => {
     expect(canAnalyzeWithAST("swift")).toBe(false);
+    expect(canAnalyzeWithAST("java")).toBe(false);
     expect(canAnalyzeWithAST("unknown")).toBe(false);
   });
 });

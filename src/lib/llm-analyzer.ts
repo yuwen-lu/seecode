@@ -41,7 +41,8 @@ export async function analyzeWithHybridStreaming(
   onFallback?: (message: string) => void,
 ): Promise<LLMAnalysisResult> {
   const astBaseline = analyzeWithAST(extraction, sourceFiles);
-  const structureSummary = buildStructureSummary(extraction, sourceFiles);
+  // Facts only — the LLM refines the AST graph, it never reads raw source
+  const structureSummary = buildStructureSummary(extraction, sourceFiles, { includeRawSource: false });
   const prompt = buildHybridPrompt(structureSummary, astBaseline, repoName);
 
   try {
@@ -111,7 +112,9 @@ export async function analyzeWithLLMStreaming(
 function buildStructureSummary(
   extraction: ExtractionResult,
   sourceFiles: SourceFile[],
+  options: { includeRawSource?: boolean } = {},
 ): string {
+  const { includeRawSource = true } = options;
   const parts: string[] = [];
 
   // Files with Tree-sitter extraction
@@ -155,11 +158,18 @@ function buildStructureSummary(
     }
   }
 
-  // Files without Tree-sitter extraction — include raw source
+  // Files without Tree-sitter extraction. In facts-only mode (hybrid path)
+  // just list their paths; otherwise include raw source for LLM analysis.
   const extractedPaths = new Set(extraction.files.map((f) => f.filePath));
   const unextracted = sourceFiles.filter((f) => !extractedPaths.has(f.relativePath));
 
-  if (unextracted.length > 0) {
+  if (unextracted.length > 0 && !includeRawSource) {
+    parts.push("## Other Source Files (no AST extraction available)\n");
+    for (const sf of unextracted) {
+      parts.push(`- ${sf.relativePath} [${sf.language}]`);
+    }
+    parts.push("");
+  } else if (unextracted.length > 0) {
     parts.push("## Raw Source Files (no AST extraction available)\n");
     for (const sf of unextracted) {
       try {

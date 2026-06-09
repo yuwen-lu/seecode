@@ -6,7 +6,7 @@ import { extractPython } from "./python";
 import { extractGo } from "./go";
 import { extractRust } from "./rust";
 
-const TREE_SITTER_LANGUAGES = new Set([
+export const TREE_SITTER_LANGUAGES = new Set([
   "typescript", "javascript", "python", "go", "rust",
 ]);
 
