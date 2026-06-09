@@ -1,8 +1,8 @@
 import { NextRequest } from "next/server";
 import { parseGitHubUrl, cloneRepo, discoverFiles, detectPrimaryLanguage, cleanupRepo } from "@/lib/repo";
 import { extractAll } from "@/lib/extractors";
-import { analyzeWithAST, canAnalyzeWithAST } from "@/lib/ast-analyzer";
-import { analyzeWithLLMStreaming } from "@/lib/llm-analyzer";
+import { canAnalyzeWithAST } from "@/lib/ast-analyzer";
+import { analyzeWithLLMStreaming, analyzeWithHybridStreaming } from "@/lib/llm-analyzer";
 import { getCachedGraph, cacheGraph } from "@/lib/cache";
 import type { ArchGraph } from "@/types/graph";
 
@@ -69,13 +69,25 @@ export async function POST(request: NextRequest) {
         });
 
         // Step 4: Architecture analysis.
-        // TypeScript/JavaScript repos are analyzed deterministically from the
-        // AST; other languages fall back to LLM analysis.
+        // TypeScript/JavaScript repos use a hybrid workflow: deterministic AST
+        // facts first, then LLM semantic refinement with AST fallback. Other
+        // languages continue to use the existing LLM analysis over extracted AST
+        // summaries/raw snippets.
         let analysis: { modules: ArchGraph["modules"]; edges: ArchGraph["edges"] };
 
         if (canAnalyzeWithAST(primaryLanguage)) {
-          send("status", { step: "analyzing", message: "Building architecture from AST..." });
-          analysis = analyzeWithAST(extraction, files);
+          send("status", {
+            step: "analyzing",
+            message: "Building architecture from AST and refining with Claude...",
+          });
+          analysis = await analyzeWithHybridStreaming(
+            extraction,
+            files,
+            repoName,
+            (chunk: string) => {
+              send("chunk", { text: chunk });
+            },
+          );
         } else {
           send("status", { step: "analyzing", message: "Analyzing architecture with Claude..." });
           analysis = await analyzeWithLLMStreaming(
