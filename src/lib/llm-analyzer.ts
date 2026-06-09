@@ -4,7 +4,12 @@ import type { SourceFile } from "./repo";
 import type { ArchModule, ArchEdge, NodeCategory } from "@/types/graph";
 import fs from "fs";
 import path from "path";
-import { analyzeWithAST, type ASTAnalysisResult } from "./ast-analyzer";
+import {
+  analyzeWithAST,
+  classifyModuleEdge,
+  countLines,
+  type ASTAnalysisResult,
+} from "./ast-analyzer";
 
 const client = new Anthropic();
 
@@ -33,6 +38,7 @@ export async function analyzeWithHybridStreaming(
   sourceFiles: SourceFile[],
   repoName: string,
   onChunk: (text: string) => void,
+  onFallback?: (message: string) => void,
 ): Promise<LLMAnalysisResult> {
   const astBaseline = analyzeWithAST(extraction, sourceFiles);
   const structureSummary = buildStructureSummary(extraction, sourceFiles);
@@ -62,7 +68,7 @@ export async function analyzeWithHybridStreaming(
     return reconcileLLMWithAST(llmResult, astBaseline, extraction, sourceFiles);
   } catch (err) {
     console.warn("Hybrid LLM refinement failed; falling back to AST baseline:", err);
-    onChunk("\n\n<!-- Hybrid LLM refinement failed; using deterministic AST graph. -->\n");
+    onFallback?.("Claude refinement unavailable — using the deterministic AST graph.");
     return astBaseline;
   }
 }
@@ -231,10 +237,11 @@ Hard validation rules:
 - Prefer 5-12 modules for medium repos; fewer for tiny repos.
 - Edge endpoints must use module ids from your modules array.
 - Edge type must be one of: owns, depends, dataflow, weak.
+- Only include edges backed by an actual dependency in the AST graph (re-typed or re-labeled is fine); edges with no underlying import relationship will be discarded.
 
 Current deterministic AST graph:
 \`\`\`json
-${JSON.stringify(astBaseline, null, 2)}
+${JSON.stringify(astBaseline)}
 \`\`\`
 
 Respond in EXACTLY this format (no other text):
@@ -407,7 +414,7 @@ function reconcileLLMWithAST(
     for (const file of mod.files) baselineByFile.set(normalizePath(file), mod);
   }
 
-  const lineCounts = getLineCounts(sourceFiles);
+  const lineCounts = countLines(sourceFiles);
   const usedIds = new Set<string>();
   const assigned = new Set<string>();
   const modules: ArchModule[] = [];
@@ -473,32 +480,15 @@ function reconcileEdges(
   extraction: ExtractionResult,
 ): ArchEdge[] {
   const moduleIds = new Set(modules.map((m) => m.id));
-  const llmByPair = new Map<string, ArchEdge>();
-  const edges: ArchEdge[] = [];
-  const seen = new Set<string>();
-
-  for (const edge of llmEdges) {
-    if (!moduleIds.has(edge.from) || !moduleIds.has(edge.to) || edge.from === edge.to) continue;
-    const type = isEdgeType(edge.type) ? edge.type : "depends";
-    const sanitized: ArchEdge = {
-      from: edge.from,
-      to: edge.to,
-      type,
-      label: safeString(edge.label) || undefined,
-    };
-    const key = edgeKey(sanitized.from, sanitized.to);
-    llmByPair.set(key, sanitized);
-    if (!seen.has(key)) {
-      seen.add(key);
-      edges.push(sanitized);
-    }
-  }
-
+  const filesByModule = new Map<string, string[]>();
   const fileToModule = new Map<string, string>();
   for (const mod of modules) {
-    for (const file of mod.files) fileToModule.set(normalizePath(file), mod.id);
+    const files = mod.files.map(normalizePath);
+    filesByModule.set(mod.id, files);
+    for (const file of files) fileToModule.set(file, mod.id);
   }
 
+  // The factual edge set: module pairs connected by an actual file-level dependency
   const dependencyNames = new Map<string, string[]>();
   for (const edge of extraction.dependencyEdges) {
     const from = fileToModule.get(normalizePath(edge.fromFile));
@@ -508,16 +498,32 @@ function reconcileEdges(
     dependencyNames.set(key, [...(dependencyNames.get(key) ?? []), ...edge.importedNames]);
   }
 
+  // LLM edges may only re-type/re-label real dependencies, never invent new ones
+  const llmByPair = new Map<string, ArchEdge>();
+  for (const edge of llmEdges) {
+    if (!moduleIds.has(edge.from) || !moduleIds.has(edge.to) || edge.from === edge.to) continue;
+    const key = edgeKey(edge.from, edge.to);
+    if (!dependencyNames.has(key) || llmByPair.has(key)) continue;
+    llmByPair.set(key, {
+      from: edge.from,
+      to: edge.to,
+      type: isEdgeType(edge.type) ? edge.type : "depends",
+      label: safeString(edge.label) || undefined,
+    });
+  }
+
+  const extractedByPath = new Map(extraction.files.map((f) => [f.filePath, f]));
+  const edges: ArchEdge[] = [];
+
   for (const [key, names] of dependencyNames) {
-    if (seen.has(key)) continue;
-    seen.add(key);
     const [from, to] = key.split("\u0000");
     const llm = llmByPair.get(key);
     const uniqueNames = dedupeStrings(names).filter(Boolean);
     edges.push({
       from,
       to,
-      type: llm?.type ?? "depends",
+      type: llm?.type
+        ?? classifyModuleEdge(filesByModule.get(from)!, filesByModule.get(to)!, uniqueNames, extractedByPath),
       label: llm?.label ?? (uniqueNames.length > 0 ? listLabels(uniqueNames, 3) : undefined),
     });
   }
@@ -537,19 +543,6 @@ function findBestModuleForUnassignedFile(
     ?? modules.find((m) => m.name === fallback.name)
     ?? modules.find((m) => m.category === fallback.category)
     ?? modules[0];
-}
-
-function getLineCounts(sourceFiles: SourceFile[]): Map<string, number> {
-  const counts = new Map<string, number>();
-  for (const sf of sourceFiles) {
-    try {
-      const content = fs.readFileSync(sf.absolutePath, "utf-8");
-      counts.set(normalizePath(sf.relativePath), content.split("\n").length);
-    } catch {
-      counts.set(normalizePath(sf.relativePath), 0);
-    }
-  }
-  return counts;
 }
 
 function isNodeCategory(value: unknown): value is NodeCategory {

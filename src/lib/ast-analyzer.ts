@@ -64,7 +64,7 @@ export function analyzeWithAST(
   return { modules, edges };
 }
 
-function countLines(sourceFiles: SourceFile[]): Map<string, number> {
+export function countLines(sourceFiles: SourceFile[]): Map<string, number> {
   const counts = new Map<string, number>();
   for (const sf of sourceFiles) {
     try {
@@ -307,10 +307,10 @@ function buildModuleEdges(
   extractedByPath: Map<string, ExtractedFile>,
 ): ArchEdge[] {
   const moduleByFile = new Map<string, string>();
-  const dirByModule = new Map<string, string>();
+  const filesByModule = new Map<string, string[]>();
   for (const [dir, files] of groups) {
     const id = idByDir.get(dir)!;
-    dirByModule.set(id, dir);
+    filesByModule.set(id, files);
     for (const f of files) moduleByFile.set(f, id);
   }
 
@@ -332,7 +332,7 @@ function buildModuleEdges(
     edges.push({
       from,
       to,
-      type: classifyEdge(from, to, uniqueNames, dirByModule, groups, extractedByPath),
+      type: classifyModuleEdge(filesByModule.get(from)!, filesByModule.get(to)!, uniqueNames, extractedByPath),
       label: uniqueNames.length > 0 ? listSome(uniqueNames, 3) : undefined,
     });
   }
@@ -340,23 +340,25 @@ function buildModuleEdges(
   return edges.sort((a, b) => (a.from + a.to).localeCompare(b.from + b.to));
 }
 
-function classifyEdge(
-  from: string,
-  to: string,
+/**
+ * Classify a module-level dependency edge from the file groups it connects.
+ * Works for any grouping of files (directory modules or LLM-refined ones).
+ */
+export function classifyModuleEdge(
+  fromFiles: string[],
+  toFiles: string[],
   importedNames: string[],
-  dirByModule: Map<string, string>,
-  groups: Map<string, string[]>,
   extractedByPath: Map<string, ExtractedFile>,
 ): ArchEdge["type"] {
   // A module importing from a directory nested inside it "owns" that submodule
-  const fromDir = dirByModule.get(from)!;
-  const toDir = dirByModule.get(to)!;
+  const fromDir = commonDir(fromFiles);
+  const toDir = commonDir(toFiles);
   if (fromDir !== "." && toDir.startsWith(fromDir + "/")) return "owns";
 
   // If every imported name is a type-only export of the target, the coupling is weak
   const targetValueNames = new Set<string>();
   const targetTypeNames = new Set<string>();
-  for (const file of groups.get(toDir) ?? []) {
+  for (const file of toFiles) {
     const ex = extractedByPath.get(file);
     if (!ex) continue;
     for (const cls of ex.classes) targetValueNames.add(cls.name);
@@ -375,4 +377,22 @@ function classifyEdge(
   }
 
   return "depends";
+}
+
+/** Deepest directory that contains all the given files. */
+function commonDir(files: string[]): string {
+  let prefix: string[] | null = null;
+  for (const f of files) {
+    const dir = path.posix.dirname(f);
+    const segments = dir === "." ? [] : dir.split("/");
+    if (prefix === null) {
+      prefix = segments;
+      continue;
+    }
+    let i = 0;
+    while (i < prefix.length && i < segments.length && prefix[i] === segments[i]) i++;
+    prefix = prefix.slice(0, i);
+    if (prefix.length === 0) break;
+  }
+  return prefix && prefix.length > 0 ? prefix.join("/") : ".";
 }

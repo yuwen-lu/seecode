@@ -87,6 +87,9 @@ export async function POST(request: NextRequest) {
             (chunk: string) => {
               send("chunk", { text: chunk });
             },
+            (message: string) => {
+              send("status", { step: "analyzing", message });
+            },
           );
         } else {
           send("status", { step: "analyzing", message: "Analyzing architecture with Claude..." });

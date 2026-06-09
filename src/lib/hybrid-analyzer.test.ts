@@ -83,7 +83,55 @@ describe("hybrid AST + LLM reconciliation", () => {
 
     expect(prompt).toContain("deterministic graph from Tree-sitter AST parsing");
     expect(prompt).toContain("Every source file from the AST/source summary must appear in exactly one module");
-    expect(prompt).toContain(JSON.stringify(ast, null, 2));
+    expect(prompt).toContain(JSON.stringify(ast));
+  });
+
+  it("drops LLM edges that have no underlying file-level dependency", () => {
+    const sourceFiles = writeFixture("invented-edges", fixtures["vercel/next.js-style app router"]);
+    const extraction = extractAll(sourceFiles);
+    const ast = analyzeWithAST(extraction, sourceFiles);
+    const llm = {
+      modules: ast.modules.map((m) => ({ ...m })),
+      // client never imports shared — this edge is invented
+      edges: [
+        { from: "client", to: "shared", type: "dataflow" as const, label: "totally invented" },
+      ],
+    };
+
+    const result = reconcileLLMWithAST(llm, ast, extraction, sourceFiles);
+
+    expect(result.edges.some((e) => e.label === "totally invented")).toBe(false);
+    // Real dependencies are still present
+    expect(result.edges.length).toBeGreaterThan(0);
+  });
+
+  it("honors LLM re-typing/re-labeling of an edge backed by a real dependency", () => {
+    const sourceFiles = writeFixture("retype-edges", fixtures["vercel/next.js-style app router"]);
+    const extraction = extractAll(sourceFiles);
+    const ast = analyzeWithAST(extraction, sourceFiles);
+    const real = ast.edges[0];
+    const llm = {
+      modules: ast.modules.map((m) => ({ ...m })),
+      edges: [{ from: real.from, to: real.to, type: "dataflow" as const, label: "renders HTML" }],
+    };
+
+    const result = reconcileLLMWithAST(llm, ast, extraction, sourceFiles);
+    const edge = result.edges.find((e) => e.from === real.from && e.to === real.to);
+
+    expect(edge?.type).toBe("dataflow");
+    expect(edge?.label).toBe("renders HTML");
+  });
+
+  it("preserves deterministic AST edge types when the LLM omits edges", () => {
+    const sourceFiles = writeFixture("preserve-types", fixtures["vercel/next.js-style app router"]);
+    const extraction = extractAll(sourceFiles);
+    const ast = analyzeWithAST(extraction, sourceFiles);
+    const llm = { modules: ast.modules.map((m) => ({ ...m })), edges: [] };
+
+    const result = reconcileLLMWithAST(llm, ast, extraction, sourceFiles);
+
+    // Same module grouping + no LLM edge overrides → identical edges to the AST baseline
+    expect(result.edges).toEqual(ast.edges);
   });
 
   it("keeps every real file exactly once and removes hallucinated files from LLM output", () => {
