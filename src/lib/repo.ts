@@ -1,4 +1,4 @@
-import { execSync } from "child_process";
+import { execFileSync } from "child_process";
 import fs from "fs";
 import path from "path";
 import os from "os";
@@ -67,8 +67,11 @@ export interface SourceFile {
 export function parseGitHubUrl(url: string): { owner: string; repo: string; cloneUrl: string } {
   const cleaned = url.trim().replace(/\/+$/, "");
 
+  // Restrict owner/repo to GitHub's real identifier charset. This is a security
+  // boundary, not just a UX nicety: these values flow into git invocations and
+  // URLs, so anything outside [A-Za-z0-9._-] (backticks, $, |, /, …) is rejected.
   const match = cleaned.match(
-    /(?:https?:\/\/)?github\.com\/([^/]+)\/([^/.]+)/
+    /^(?:https?:\/\/)?github\.com\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+?)(?:\.git)?(?:\/|$)/
   );
   if (!match) {
     throw new Error(
@@ -78,6 +81,12 @@ export function parseGitHubUrl(url: string): { owner: string; repo: string; clon
 
   const owner = match[1];
   const repo = match[2];
+
+  // Reject path-traversal style names so repo can't escape the temp directory.
+  if (owner === "." || owner === ".." || repo === "." || repo === "..") {
+    throw new Error("Invalid GitHub URL. Expected format: https://github.com/owner/repo");
+  }
+
   return {
     owner,
     repo,
@@ -94,7 +103,9 @@ export function cloneRepo(cloneUrl: string, repoName: string): { repoDir: string
   const repoDir = path.join(tmpDir, repoName);
 
   try {
-    execSync(`git clone --depth 1 "${cloneUrl}" "${repoDir}"`, {
+    // argv form (no shell) — cloneUrl/repoDir are never parsed by /bin/sh, and
+    // "--" prevents a leading-dash value from being read as a git option.
+    execFileSync("git", ["clone", "--depth", "1", "--", cloneUrl, repoDir], {
       stdio: "pipe",
       timeout: 60_000,
     });
@@ -118,7 +129,7 @@ export function cloneRepo(cloneUrl: string, repoName: string): { repoDir: string
 
   let commitSha = "unknown";
   try {
-    commitSha = execSync("git rev-parse HEAD", { cwd: repoDir, stdio: "pipe" })
+    commitSha = execFileSync("git", ["rev-parse", "HEAD"], { cwd: repoDir, stdio: "pipe" })
       .toString()
       .trim();
   } catch {
@@ -138,7 +149,7 @@ let gitAvailable: boolean | null = null;
 export function isGitAvailable(): boolean {
   if (gitAvailable === null) {
     try {
-      execSync("git --version", { stdio: "pipe", timeout: 10_000 });
+      execFileSync("git", ["--version"], { stdio: "pipe", timeout: 10_000 });
       gitAvailable = true;
     } catch {
       gitAvailable = false;
